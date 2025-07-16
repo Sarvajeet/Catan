@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from catan.src.game import Game
+import math
 
 class CatanUI:
     def __init__(self, master):
@@ -66,17 +67,10 @@ class CatanUI:
         x, y = 100, 100
         size = 30
         for i, tile in enumerate(self.game.board.tiles):
-            points = []
-            for j in range(6):
-                angle = j * 60
-                x_offset = size * (3**0.5) * (i % 5 + 0.5 * (i // 5 % 2))
-                y_offset = size * 1.5 * (i // 5)
-                points.append((
-                    x + x_offset + size * (3**0.5) / 2 + size * (3**0.5) / 2 * (j % 2),
-                    y + y_offset + size * (j // 2)
-                ))
-            self.canvas.create_polygon(points, fill=self.get_tile_color(tile.resource), outline="black")
-            self.canvas.create_text(x + x_offset + size, y + y_offset + size, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
+            x_pos = x + (i % 5) * 60
+            y_pos = y + (i // 5) * 60
+            self.canvas.create_oval(x_pos, y_pos, x_pos + 50, y_pos + 50, fill=self.get_tile_color(tile.resource))
+            self.canvas.create_text(x_pos + 25, y_pos + 25, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
 
     def get_tile_color(self, resource):
         if resource is None:
@@ -88,6 +82,16 @@ class CatanUI:
             "brick": "firebrick",
             "ore": "darkgray"
         }.get(resource.value, "white")
+
+    def get_hexagon_points(self, x, y, size):
+        return [
+            x, y + size,
+            x + size * math.sqrt(3) / 2, y + size / 2,
+            x + size * math.sqrt(3) / 2, y - size / 2,
+            x, y - size,
+            x - size * math.sqrt(3) / 2, y - size / 2,
+            x - size * math.sqrt(3) / 2, y + size / 2
+        ]
 
     def roll_dice(self):
         roll = self.game.roll_dice()
