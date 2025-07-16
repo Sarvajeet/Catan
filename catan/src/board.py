@@ -1,9 +1,12 @@
 import random
 from catan.src.components import Tile, Resource
+from catan.src.graph import Graph
 
 class Board:
     def __init__(self):
+        self.graph = Graph()
         self.tiles = self._create_tiles()
+        self._create_board_graph()
 
     def _create_tiles(self):
         resources = [
@@ -26,3 +29,28 @@ class Board:
         tiles.insert(random.randint(0, len(tiles)), Tile(None, 7))
 
         return tiles
+
+    def _create_board_graph(self):
+        # This is a simplified representation of the board graph.
+        # We will improve this later.
+        for i in range(len(self.tiles)):
+            self.graph.addVertex(i)
+
+        # Add edges between adjacent tiles
+        # This is a simplified representation of the board graph.
+        # We will improve this later.
+        for i in range(len(self.tiles)):
+            if i % 5 != 4:
+                self.graph.addEdge(i, i + 1)
+            if i < len(self.tiles) - 5:
+                self.graph.addEdge(i, i + 5)
+
+    def get_tiles_for_settlement(self, settlement_location):
+        # This is a simplified version. We need to implement a way to get the
+        # tiles for a given settlement location.
+        return [self.tiles[0]]
+
+    def get_vertices_for_settlement(self, settlement_location):
+        # This is a simplified version. We need to implement a way to get the
+        # vertices for a given settlement location.
+        return [self.graph.getVertex(0)]

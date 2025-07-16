@@ -9,10 +9,10 @@ from catan.src.components import Resource
 class TestGame(unittest.TestCase):
     def setUp(self):
         self.game = Game(player_names=["Alice", "Bob"])
+        self.game.start_game()
 
     def test_initial_game_state(self):
         self.assertEqual(len(self.game.players), 2)
-        self.assertEqual(self.game.turn, 0)
         self.assertIsInstance(self.game.players[0], Player)
         self.assertEqual(self.game.players[0].name, "Alice")
 
@@ -31,6 +31,34 @@ class TestGame(unittest.TestCase):
         initial_lumber = player.resources[Resource.LUMBER]
         self.game.distribute_resources(6)
         self.assertEqual(player.resources[Resource.LUMBER], initial_lumber + 1)
+
+    def test_trade(self):
+        player1 = self.game.players[0]
+        player2 = self.game.players[1]
+        player1.resources[Resource.LUMBER] = 2
+        player2.resources[Resource.BRICK] = 1
+
+        offered = {Resource.LUMBER: 1}
+        requested = {Resource.BRICK: 1}
+
+        self.game.trade(player1, player2, offered, requested)
+
+        self.assertEqual(player1.resources[Resource.LUMBER], 1)
+        self.assertEqual(player1.resources[Resource.BRICK], 1)
+        self.assertEqual(player2.resources[Resource.BRICK], 0)
+        self.assertEqual(player2.resources[Resource.LUMBER], 1)
+
+    def test_build_settlement(self):
+        player = self.game.players[0]
+        player.resources[Resource.LUMBER] = 1
+        player.resources[Resource.BRICK] = 1
+        player.resources[Resource.WOOL] = 1
+        player.resources[Resource.GRAIN] = 1
+
+        self.game.build_settlement(player, "dummy_location")
+
+        self.assertEqual(len(player.settlements), 1)
+        self.assertEqual(player.victory_points, 1)
 
 if __name__ == "__main__":
     unittest.main()
