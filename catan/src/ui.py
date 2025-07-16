@@ -35,23 +35,48 @@ class CatanUI:
         self.build_city_button = tk.Button(master, text="Build City", command=self.build_city)
         self.build_city_button.pack()
 
+        self.player_frames = []
+        for i in range(4):
+            frame = tk.Frame(self.master)
+            self.player_frames.append(frame)
+
+        self.player_frames[0].pack(side=tk.TOP, fill=tk.X)
+        self.player_frames[1].pack(side=tk.BOTTOM, fill=tk.X)
+        self.player_frames[2].pack(side=tk.LEFT, fill=tk.Y)
+        self.player_frames[3].pack(side=tk.RIGHT, fill=tk.Y)
+
         self.resource_labels = []
         for i, player in enumerate(self.game.players):
-            label = tk.Label(master, text=f"{player.name}'s Resources: {player.resources}")
+            label = tk.Label(self.player_frames[i], text=f"{player.name}'s Resources: {player.resources}")
             label.pack()
             self.resource_labels.append(label)
+
+        self.trade_card_frame = tk.Frame(self.master)
+        self.trade_card_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.trade_card_labels = {}
+        for resource in self.game.players[0].resources.keys():
+            label = tk.Label(self.trade_card_frame, text=f"{resource.name}: 0")
+            label.pack(side=tk.LEFT)
+            self.trade_card_labels[resource] = label
 
     def draw_board(self):
         # This is a simplified representation of the board.
         # We will improve this later.
         x, y = 100, 100
+        size = 30
         for i, tile in enumerate(self.game.board.tiles):
-            self.canvas.create_oval(x, y, x + 50, y + 50, fill=self.get_tile_color(tile.resource))
-            self.canvas.create_text(x + 25, y + 25, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
-            x += 60
-            if (i + 1) % 5 == 0:
-                y += 60
-                x = 100
+            points = []
+            for j in range(6):
+                angle = j * 60
+                x_offset = size * (3**0.5) * (i % 5 + 0.5 * (i // 5 % 2))
+                y_offset = size * 1.5 * (i // 5)
+                points.append((
+                    x + x_offset + size * (3**0.5) / 2 + size * (3**0.5) / 2 * (j % 2),
+                    y + y_offset + size * (j // 2)
+                ))
+            self.canvas.create_polygon(points, fill=self.get_tile_color(tile.resource), outline="black")
+            self.canvas.create_text(x + x_offset + size, y + y_offset + size, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
 
     def get_tile_color(self, resource):
         if resource is None:
