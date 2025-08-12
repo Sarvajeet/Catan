@@ -1,6 +1,11 @@
 from enum import Enum
 import collections
 
+class GamePhase(Enum):
+    SETUP_ROUND_1 = "setup_round_1"
+    SETUP_ROUND_2 = "setup_round_2"
+    MAIN_GAME = "main_game"
+
 class Resource(Enum):
     LUMBER = "lumber"
     WOOL = "wool"

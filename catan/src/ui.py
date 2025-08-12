@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from catan.src.game import Game
-from catan.src.components import Resource, Hex
+from catan.src.components import Resource, Hex, GamePhase
 import math
 import collections
 
@@ -20,19 +20,6 @@ def hex_to_pixel(layout, h):
     y = (M['f2'] * h.q + M['f3'] * h.r) * layout.size.y
     return Point(x + layout.origin.x, y + layout.origin.y)
 
-def pixel_to_hex(layout, p):
-    M = layout.orientation
-    pt = Point((p.x - layout.origin.x) / layout.size.x, (p.y - layout.origin.y) / layout.size.y)
-    q = M['b0'] * pt.x + M['b1'] * pt.y
-    r = M['b2'] * pt.x + M['b3'] * pt.y
-    return Hex(q, r, -q - r)
-
-def hex_corner_offset(layout, corner):
-    M = layout.orientation
-    size = layout.size
-    angle = 2.0 * math.pi * (M['start_angle'] + corner) / 6.0
-    return Point(size.x * math.cos(angle), size.y * math.sin(angle))
-
 def polygon_corners(layout, h):
     corners = []
     center = hex_to_pixel(layout, h)
@@ -40,6 +27,12 @@ def polygon_corners(layout, h):
         offset = hex_corner_offset(layout, i)
         corners.append(Point(center.x + offset.x, center.y + offset.y))
     return corners
+
+def hex_corner_offset(layout, corner):
+    M = layout.orientation
+    size = layout.size
+    angle = 2.0 * math.pi * (M['start_angle'] + corner) / 6.0
+    return Point(size.x * math.cos(angle), size.y * math.sin(angle))
 
 layout_pointy = {
     'f0': math.sqrt(3.0), 'f1': math.sqrt(3.0) / 2.0, 'f2': 0.0, 'f3': 3.0 / 2.0,
@@ -52,6 +45,7 @@ class CatanUI:
         self.master = master
         self.master.title("Catan")
         self.game = Game(player_names=["Player 1", "Player 2", "Player 3"])
+        self.game.start_game()
         self.canvas = tk.Canvas(master, width=800, height=600, bg='lightblue')
         self.canvas.pack()
         self.layout = Layout(layout_pointy, Point(30, 30), Point(400, 300))
@@ -59,9 +53,14 @@ class CatanUI:
 
         self.canvas.bind("<Button-1>", self.canvas_click)
         self.create_widgets()
+        self.update_ui_for_game_phase()
         self.draw_board()
 
     def create_widgets(self):
+        # Instruction Label
+        self.instruction_label = tk.Label(self.master, text="", font=("Arial", 12))
+        self.instruction_label.pack()
+
         # Player info and controls
         controls_frame = tk.Frame(self.master)
         controls_frame.pack()
@@ -78,7 +77,6 @@ class CatanUI:
         self.build_road_button = tk.Button(controls_frame, text="Build Road", command=self.activate_build_road)
         self.build_road_button.pack(side=tk.LEFT)
 
-        # Player Info labels
         self.player_info_labels = {}
         for i, player in enumerate(self.game.players):
             frame = tk.Frame(self.master)
@@ -90,9 +88,38 @@ class CatanUI:
             self.player_info_labels[player.name] = {'resources': resource_label, 'score': score_label}
         self.update_player_info_labels()
 
+    def update_ui_for_game_phase(self):
+        phase = self.game.game_phase
+        player_name = self.game.current_player.name
+
+        if phase == GamePhase.MAIN_GAME:
+            self.instruction_label.config(text=f"{player_name}'s turn. Roll the dice.")
+            self.roll_button.config(state=tk.NORMAL)
+            self.next_turn_button.config(state=tk.NORMAL)
+            self.build_settlement_button.config(state=tk.NORMAL)
+            self.build_city_button.config(state=tk.NORMAL)
+            self.build_road_button.config(state=tk.NORMAL)
+            self.building_mode = None
+        else: # Setup phase
+            self.roll_button.config(state=tk.DISABLED)
+            self.next_turn_button.config(state=tk.DISABLED)
+            self.build_settlement_button.config(state=tk.DISABLED)
+            self.build_city_button.config(state=tk.DISABLED)
+            self.build_road_button.config(state=tk.DISABLED)
+
+            if self.building_mode == "settlement":
+                self.instruction_label.config(text=f"{player_name}, place your settlement.")
+            elif self.building_mode == "road":
+                self.instruction_label.config(text=f"{player_name}, place a road connected to your new settlement.")
+            else: # Start of a setup turn
+                self.building_mode = "settlement"
+                self.instruction_label.config(text=f"{player_name}, place your settlement.")
+
+        self.current_player_label.config(text=f"Current Player: {player_name}")
+
+
     def draw_board(self):
         self.canvas.delete("all")
-        # Draw tiles
         for h, tile in self.game.board.tiles.items():
             corners = polygon_corners(self.layout, h)
             self.canvas.create_polygon([p for corner in corners for p in corner],
@@ -100,12 +127,9 @@ class CatanUI:
                                      outline="black")
             center = hex_to_pixel(self.layout, h)
             self.canvas.create_text(center.x, center.y, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
-
-        # Draw settlements, cities, and roads
         self.draw_pieces()
 
     def draw_pieces(self):
-        # Draw roads
         for player in self.game.players:
             for road in player.roads:
                 v1_loc, v2_loc = tuple(road)
@@ -113,8 +137,6 @@ class CatanUI:
                 p2 = self.get_vertex_pixel(v2_loc)
                 self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, fill=player.color, width=5)
 
-        # Draw settlements and cities
-        for player in self.game.players:
             for settlement_loc in player.settlements:
                 p = self.get_vertex_pixel(settlement_loc)
                 self.canvas.create_oval(p.x-5, p.y-5, p.x+5, p.y+5, fill=player.color)
@@ -123,9 +145,6 @@ class CatanUI:
                 self.canvas.create_rectangle(p.x-7, p.y-7, p.x+7, p.y+7, fill=player.color)
 
     def get_vertex_pixel(self, vertex_location):
-        # A vertex is at the corner of multiple hexes. We can average their centers.
-        # A simpler way is to treat a vertex as a point on the dual graph.
-        # For this UI, we'll average the pixel coordinates of the centers of the hexes that define the vertex.
         points = [hex_to_pixel(self.layout, h) for h in vertex_location]
         avg_x = sum(p.x for p in points) / len(points)
         avg_y = sum(p.y for p in points) / len(points)
@@ -141,13 +160,14 @@ class CatanUI:
 
     def roll_dice(self):
         roll = self.game.roll_dice()
-        messagebox.showinfo("Dice Roll", f"You rolled a {roll}")
-        self.update_player_info_labels()
-        self.draw_board()
+        if roll:
+            messagebox.showinfo("Dice Roll", f"You rolled a {roll}")
+            self.update_player_info_labels()
+            self.draw_board()
 
     def next_turn(self):
         self.game.next_turn()
-        self.current_player_label.config(text=f"Current Player: {self.game.current_player.name}")
+        self.update_ui_for_game_phase()
 
     def update_player_info_labels(self):
         for player in self.game.players:
@@ -160,74 +180,77 @@ class CatanUI:
 
     def activate_build_city(self):
         self.building_mode = "city"
-        messagebox.showinfo("Build Mode", "Select a settlement to upgrade to a city.")
 
     def activate_build_road(self):
         self.building_mode = "road"
-        messagebox.showinfo("Build Mode", "Select a location to build a road.")
 
     def canvas_click(self, event):
         if not self.building_mode:
             return
 
         click_point = Point(event.x, event.y)
+        player = self.game.current_player
 
-        if self.building_mode in ["settlement", "city"]:
-            # Find the closest vertex
-            closest_vertex = None
-            min_dist = float('inf')
-            for vertex_loc in self.game.board.vertex_map.keys():
-                vertex_pixel = self.get_vertex_pixel(vertex_loc)
-                dist = math.hypot(click_point.x - vertex_pixel.x, click_point.y - vertex_pixel.y)
-                if dist < min_dist:
-                    min_dist = dist
-                    closest_vertex = vertex_loc
-
-            if closest_vertex and min_dist < 20: # 20 is a tolerance
-                player = self.game.current_player
-                if self.building_mode == "settlement":
-                    success = self.game.build_settlement(player, closest_vertex)
-                    if success:
-                        messagebox.showinfo("Build", "Settlement built successfully!")
+        if self.building_mode == "settlement":
+            closest_vertex = self.find_closest_vertex(click_point)
+            if closest_vertex:
+                success = self.game.build_settlement(player, closest_vertex)
+                if success:
+                    if self.game.game_phase != GamePhase.MAIN_GAME:
+                        self.building_mode = "road"
                     else:
-                        messagebox.showerror("Build", "Failed to build settlement.")
-                elif self.building_mode == "city":
-                    success = self.game.build_city(player, closest_vertex)
-                    if success:
-                        messagebox.showinfo("Build", "City built successfully!")
-                    else:
-                        messagebox.showerror("Build", "Failed to build city.")
+                        self.building_mode = None
+                else:
+                    messagebox.showerror("Build", "Failed to build settlement.")
 
         elif self.building_mode == "road":
-            # Find the closest edge
-            closest_edge = None
-            min_dist = float('inf')
-            for v1_id in self.game.board.graph.getVertices():
-                v1 = self.game.board.graph.getVertex(v1_id)
-                for v2 in v1.getConnections():
-                    v2_id = v2.getId()
-                    if v1_id < v2_id: # Avoid duplicates
-                        v1_loc = self.game.board.reverse_vertex_map[v1_id]
-                        v2_loc = self.game.board.reverse_vertex_map[v2_id]
-                        p1 = self.get_vertex_pixel(v1_loc)
-                        p2 = self.get_vertex_pixel(v2_loc)
-                        mid_point = Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2)
-                        dist = math.hypot(click_point.x - mid_point.x, click_point.y - mid_point.y)
-                        if dist < min_dist:
-                            min_dist = dist
-                            closest_edge = frozenset([v1_loc, v2_loc])
-
-            if closest_edge and min_dist < 20:
-                player = self.game.current_player
+            closest_edge = self.find_closest_edge(click_point)
+            if closest_edge:
                 success = self.game.build_road(player, closest_edge)
                 if success:
-                    messagebox.showinfo("Build", "Road built successfully!")
+                    if self.game.game_phase != GamePhase.MAIN_GAME:
+                        self.game.next_setup_turn()
+                    self.building_mode = None
                 else:
                     messagebox.showerror("Build", "Failed to build road.")
 
-        self.building_mode = None
+        elif self.building_mode == "city":
+            closest_vertex = self.find_closest_vertex(click_point)
+            if closest_vertex:
+                success = self.game.build_city(player, closest_vertex)
+                if not success:
+                    messagebox.showerror("Build", "Failed to build city.")
+                self.building_mode = None
+
         self.update_player_info_labels()
+        self.update_ui_for_game_phase()
         self.draw_board()
+
+    def find_closest_vertex(self, click_point):
+        closest_vertex, min_dist = None, float('inf')
+        for vertex_loc in self.game.board.vertex_map.keys():
+            vertex_pixel = self.get_vertex_pixel(vertex_loc)
+            dist = math.hypot(click_point.x - vertex_pixel.x, click_point.y - vertex_pixel.y)
+            if dist < min_dist:
+                min_dist, closest_vertex = dist, vertex_loc
+        return closest_vertex if min_dist < 20 else None
+
+    def find_closest_edge(self, click_point):
+        closest_edge, min_dist = None, float('inf')
+        for v1_id in self.game.board.graph.getVertices():
+            v1 = self.game.board.graph.getVertex(v1_id)
+            for v2 in v1.getConnections():
+                v2_id = v2.getId()
+                if v1_id < v2_id:
+                    v1_loc = self.game.board.reverse_vertex_map[v1_id]
+                    v2_loc = self.game.board.reverse_vertex_map[v2_id]
+                    p1 = self.get_vertex_pixel(v1_loc)
+                    p2 = self.get_vertex_pixel(v2_loc)
+                    mid_point = Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2)
+                    dist = math.hypot(click_point.x - mid_point.x, click_point.y - mid_point.y)
+                    if dist < min_dist:
+                        min_dist, closest_edge = dist, frozenset([v1_loc, v2_loc])
+        return closest_edge if min_dist < 20 else None
 
 if __name__ == "__main__":
     root = tk.Tk()
