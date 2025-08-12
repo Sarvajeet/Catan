@@ -78,15 +78,17 @@ class CatanUI:
         self.build_road_button = tk.Button(controls_frame, text="Build Road", command=self.activate_build_road)
         self.build_road_button.pack(side=tk.LEFT)
 
-        # Resource labels
-        self.resource_labels = {}
+        # Player Info labels
+        self.player_info_labels = {}
         for i, player in enumerate(self.game.players):
             frame = tk.Frame(self.master)
             frame.pack()
-            label = tk.Label(frame, text=f"{player.name}'s Resources: {player.resources}")
-            label.pack()
-            self.resource_labels[player.name] = label
-        self.update_resource_labels()
+            resource_label = tk.Label(frame, text=f"{player.name}'s Resources: {player.resources}")
+            resource_label.pack(side=tk.LEFT)
+            score_label = tk.Label(frame, text=f"Score: {player.victory_points}")
+            score_label.pack(side=tk.LEFT)
+            self.player_info_labels[player.name] = {'resources': resource_label, 'score': score_label}
+        self.update_player_info_labels()
 
     def draw_board(self):
         self.canvas.delete("all")
@@ -140,16 +142,17 @@ class CatanUI:
     def roll_dice(self):
         roll = self.game.roll_dice()
         messagebox.showinfo("Dice Roll", f"You rolled a {roll}")
-        self.update_resource_labels()
+        self.update_player_info_labels()
         self.draw_board()
 
     def next_turn(self):
         self.game.next_turn()
         self.current_player_label.config(text=f"Current Player: {self.game.current_player.name}")
 
-    def update_resource_labels(self):
+    def update_player_info_labels(self):
         for player in self.game.players:
-            self.resource_labels[player.name].config(text=f"{player.name}'s Resources: {dict(player.resources)}")
+            self.player_info_labels[player.name]['resources'].config(text=f"{player.name}'s Resources: {dict(player.resources)}")
+            self.player_info_labels[player.name]['score'].config(text=f"Score: {player.victory_points}")
 
     def activate_build_settlement(self):
         self.building_mode = "settlement"
@@ -223,7 +226,7 @@ class CatanUI:
                     messagebox.showerror("Build", "Failed to build road.")
 
         self.building_mode = None
-        self.update_resource_labels()
+        self.update_player_info_labels()
         self.draw_board()
 
 if __name__ == "__main__":
