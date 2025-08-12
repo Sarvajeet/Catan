@@ -1,186 +1,230 @@
 import tkinter as tk
 from tkinter import messagebox
 from catan.src.game import Game
+from catan.src.components import Resource, Hex
 import math
+import collections
+
+# Hex grid layout and drawing logic from Red Blob Games
+Point = collections.namedtuple("Point", ["x", "y"])
+
+class Layout:
+    def __init__(self, orientation, size, origin):
+        self.orientation = orientation
+        self.size = size
+        self.origin = origin
+
+def hex_to_pixel(layout, h):
+    M = layout.orientation
+    x = (M['f0'] * h.q + M['f1'] * h.r) * layout.size.x
+    y = (M['f2'] * h.q + M['f3'] * h.r) * layout.size.y
+    return Point(x + layout.origin.x, y + layout.origin.y)
+
+def pixel_to_hex(layout, p):
+    M = layout.orientation
+    pt = Point((p.x - layout.origin.x) / layout.size.x, (p.y - layout.origin.y) / layout.size.y)
+    q = M['b0'] * pt.x + M['b1'] * pt.y
+    r = M['b2'] * pt.x + M['b3'] * pt.y
+    return Hex(q, r, -q - r)
+
+def hex_corner_offset(layout, corner):
+    M = layout.orientation
+    size = layout.size
+    angle = 2.0 * math.pi * (M['start_angle'] + corner) / 6.0
+    return Point(size.x * math.cos(angle), size.y * math.sin(angle))
+
+def polygon_corners(layout, h):
+    corners = []
+    center = hex_to_pixel(layout, h)
+    for i in range(6):
+        offset = hex_corner_offset(layout, i)
+        corners.append(Point(center.x + offset.x, center.y + offset.y))
+    return corners
+
+layout_pointy = {
+    'f0': math.sqrt(3.0), 'f1': math.sqrt(3.0) / 2.0, 'f2': 0.0, 'f3': 3.0 / 2.0,
+    'b0': math.sqrt(3.0) / 3.0, 'b1': -1.0 / 3.0, 'b2': 0.0, 'b3': 2.0 / 3.0,
+    'start_angle': 0.5
+}
 
 class CatanUI:
     def __init__(self, master):
         self.master = master
         self.master.title("Catan")
-
         self.game = Game(player_names=["Player 1", "Player 2", "Player 3"])
-
         self.canvas = tk.Canvas(master, width=800, height=600, bg='lightblue')
         self.canvas.pack()
+        self.layout = Layout(layout_pointy, Point(30, 30), Point(400, 300))
+        self.building_mode = None # "settlement", "city", or "road"
 
+        self.canvas.bind("<Button-1>", self.canvas_click)
+        self.create_widgets()
         self.draw_board()
 
-        self.current_player_label = tk.Label(master, text=f"Current Player: {self.game.current_player.name}")
+    def create_widgets(self):
+        # Player info and controls
+        controls_frame = tk.Frame(self.master)
+        controls_frame.pack()
+        self.current_player_label = tk.Label(controls_frame, text=f"Current Player: {self.game.current_player.name}")
         self.current_player_label.pack()
+        self.roll_button = tk.Button(controls_frame, text="Roll Dice", command=self.roll_dice)
+        self.roll_button.pack(side=tk.LEFT)
+        self.next_turn_button = tk.Button(controls_frame, text="Next Turn", command=self.next_turn)
+        self.next_turn_button.pack(side=tk.LEFT)
+        self.build_settlement_button = tk.Button(controls_frame, text="Build Settlement", command=self.activate_build_settlement)
+        self.build_settlement_button.pack(side=tk.LEFT)
+        self.build_city_button = tk.Button(controls_frame, text="Build City", command=self.activate_build_city)
+        self.build_city_button.pack(side=tk.LEFT)
+        self.build_road_button = tk.Button(controls_frame, text="Build Road", command=self.activate_build_road)
+        self.build_road_button.pack(side=tk.LEFT)
 
-        self.roll_button = tk.Button(master, text="Roll Dice", command=self.roll_dice)
-        self.roll_button.pack()
-
-        self.next_turn_button = tk.Button(master, text="Next Turn", command=self.next_turn)
-        self.next_turn_button.pack()
-
-        self.trade_button = tk.Button(master, text="Trade", command=self.open_trade_window)
-        self.trade_button.pack()
-
-        self.build_road_button = tk.Button(master, text="Build Road", command=self.build_road)
-        self.build_road_button.pack()
-
-        self.build_settlement_button = tk.Button(master, text="Build Settlement", command=self.build_settlement)
-        self.build_settlement_button.pack()
-
-        self.build_city_button = tk.Button(master, text="Build City", command=self.build_city)
-        self.build_city_button.pack()
-
-        self.player_frames = []
-        for i in range(4):
-            frame = tk.Frame(self.master)
-            self.player_frames.append(frame)
-
-        self.player_frames[0].pack(side=tk.TOP, fill=tk.X)
-        self.player_frames[1].pack(side=tk.BOTTOM, fill=tk.X)
-        self.player_frames[2].pack(side=tk.LEFT, fill=tk.Y)
-        self.player_frames[3].pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.resource_labels = []
+        # Resource labels
+        self.resource_labels = {}
         for i, player in enumerate(self.game.players):
-            label = tk.Label(self.player_frames[i], text=f"{player.name}'s Resources: {player.resources}")
+            frame = tk.Frame(self.master)
+            frame.pack()
+            label = tk.Label(frame, text=f"{player.name}'s Resources: {player.resources}")
             label.pack()
-            self.resource_labels.append(label)
-
-        self.trade_card_frame = tk.Frame(self.master)
-        self.trade_card_frame.pack(side=tk.BOTTOM, fill=tk.X)
-
-        self.trade_card_labels = {}
-        for resource in self.game.players[0].resources.keys():
-            label = tk.Label(self.trade_card_frame, text=f"{resource.name}: 0")
-            label.pack(side=tk.LEFT)
-            self.trade_card_labels[resource] = label
+            self.resource_labels[player.name] = label
+        self.update_resource_labels()
 
     def draw_board(self):
-        # This is a simplified representation of the board.
-        # We will improve this later.
-        x, y = 100, 100
-        size = 30
-        for i, tile in enumerate(self.game.board.tiles):
-            x_pos = x + (i % 5) * 60
-            y_pos = y + (i // 5) * 60
-            self.canvas.create_oval(x_pos, y_pos, x_pos + 50, y_pos + 50, fill=self.get_tile_color(tile.resource))
-            self.canvas.create_text(x_pos + 25, y_pos + 25, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
+        self.canvas.delete("all")
+        # Draw tiles
+        for h, tile in self.game.board.tiles.items():
+            corners = polygon_corners(self.layout, h)
+            self.canvas.create_polygon([p for corner in corners for p in corner],
+                                     fill=self.get_tile_color(tile.resource),
+                                     outline="black")
+            center = hex_to_pixel(self.layout, h)
+            self.canvas.create_text(center.x, center.y, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
+
+        # Draw settlements, cities, and roads
+        self.draw_pieces()
+
+    def draw_pieces(self):
+        # Draw roads
+        for player in self.game.players:
+            for road in player.roads:
+                v1_loc, v2_loc = tuple(road)
+                p1 = self.get_vertex_pixel(v1_loc)
+                p2 = self.get_vertex_pixel(v2_loc)
+                self.canvas.create_line(p1.x, p1.y, p2.x, p2.y, fill=player.color, width=5)
+
+        # Draw settlements and cities
+        for player in self.game.players:
+            for settlement_loc in player.settlements:
+                p = self.get_vertex_pixel(settlement_loc)
+                self.canvas.create_oval(p.x-5, p.y-5, p.x+5, p.y+5, fill=player.color)
+            for city_loc in player.cities:
+                p = self.get_vertex_pixel(city_loc)
+                self.canvas.create_rectangle(p.x-7, p.y-7, p.x+7, p.y+7, fill=player.color)
+
+    def get_vertex_pixel(self, vertex_location):
+        # A vertex is at the corner of multiple hexes. We can average their centers.
+        # A simpler way is to treat a vertex as a point on the dual graph.
+        # For this UI, we'll average the pixel coordinates of the centers of the hexes that define the vertex.
+        points = [hex_to_pixel(self.layout, h) for h in vertex_location]
+        avg_x = sum(p.x for p in points) / len(points)
+        avg_y = sum(p.y for p in points) / len(points)
+        return Point(avg_x, avg_y)
 
     def get_tile_color(self, resource):
-        if resource is None:
-            return "beige"
+        if resource is None: return "beige"
         return {
-            "lumber": "forestgreen",
-            "wool": "lightgray",
-            "grain": "gold",
-            "brick": "firebrick",
-            "ore": "darkgray"
-        }.get(resource.value, "white")
-
-    def get_hexagon_points(self, x, y, size):
-        return [
-            x, y + size,
-            x + size * math.sqrt(3) / 2, y + size / 2,
-            x + size * math.sqrt(3) / 2, y - size / 2,
-            x, y - size,
-            x - size * math.sqrt(3) / 2, y - size / 2,
-            x - size * math.sqrt(3) / 2, y + size / 2
-        ]
+            Resource.LUMBER: "forestgreen", Resource.WOOL: "lightgray",
+            Resource.GRAIN: "gold", Resource.BRICK: "firebrick",
+            Resource.ORE: "darkgray"
+        }.get(resource, "white")
 
     def roll_dice(self):
         roll = self.game.roll_dice()
         messagebox.showinfo("Dice Roll", f"You rolled a {roll}")
         self.update_resource_labels()
-
-    def update_resource_labels(self):
-        for i, player in enumerate(self.game.players):
-            self.resource_labels[i].config(text=f"{player.name}'s Resources: {player.resources}")
+        self.draw_board()
 
     def next_turn(self):
         self.game.next_turn()
         self.current_player_label.config(text=f"Current Player: {self.game.current_player.name}")
 
-    def open_trade_window(self):
-        trade_window = tk.Toplevel(self.master)
-        trade_window.title("Trade")
+    def update_resource_labels(self):
+        for player in self.game.players:
+            self.resource_labels[player.name].config(text=f"{player.name}'s Resources: {dict(player.resources)}")
 
-        # Offered resources
-        tk.Label(trade_window, text="Offered Resources").grid(row=0, column=0)
-        offered_entries = {}
-        for i, resource in enumerate(self.game.players[0].resources.keys()):
-            tk.Label(trade_window, text=resource.name).grid(row=i + 1, column=0)
-            entry = tk.Entry(trade_window)
-            entry.grid(row=i + 1, column=1)
-            offered_entries[resource] = entry
+    def activate_build_settlement(self):
+        self.building_mode = "settlement"
+        messagebox.showinfo("Build Mode", "Select a location to build a settlement.")
 
-        # Requested resources
-        tk.Label(trade_window, text="Requested Resources").grid(row=0, column=2)
-        requested_entries = {}
-        for i, resource in enumerate(self.game.players[0].resources.keys()):
-            tk.Label(trade_window, text=resource.name).grid(row=i + 1, column=2)
-            entry = tk.Entry(trade_window)
-            entry.grid(row=i + 1, column=3)
-            requested_entries[resource] = entry
+    def activate_build_city(self):
+        self.building_mode = "city"
+        messagebox.showinfo("Build Mode", "Select a settlement to upgrade to a city.")
 
-        # Player selection
-        tk.Label(trade_window, text="Trade with:").grid(row=len(offered_entries) + 1, column=0)
-        player_names = [p.name for p in self.game.players if p != self.game.current_player]
-        selected_player = tk.StringVar(trade_window)
-        selected_player.set(player_names[0])
-        player_menu = tk.OptionMenu(trade_window, selected_player, *player_names)
-        player_menu.grid(row=len(offered_entries) + 1, column=1)
+    def activate_build_road(self):
+        self.building_mode = "road"
+        messagebox.showinfo("Build Mode", "Select a location to build a road.")
 
-        def submit_trade():
-            offered = {res: int(entry.get() or 0) for res, entry in offered_entries.items()}
-            requested = {res: int(entry.get() or 0) for res, entry in requested_entries.items()}
+    def canvas_click(self, event):
+        if not self.building_mode:
+            return
 
-            receiving_player = next(p for p in self.game.players if p.name == selected_player.get())
+        click_point = Point(event.x, event.y)
 
-            if self.game.trade(self.game.current_player, receiving_player, offered, requested):
-                messagebox.showinfo("Trade", "Trade successful!")
-                self.update_resource_labels()
-                trade_window.destroy()
-            else:
-                messagebox.showerror("Trade", "Trade failed. Not enough resources.")
+        if self.building_mode in ["settlement", "city"]:
+            # Find the closest vertex
+            closest_vertex = None
+            min_dist = float('inf')
+            for vertex_loc in self.game.board.vertex_map.keys():
+                vertex_pixel = self.get_vertex_pixel(vertex_loc)
+                dist = math.hypot(click_point.x - vertex_pixel.x, click_point.y - vertex_pixel.y)
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_vertex = vertex_loc
 
-        submit_button = tk.Button(trade_window, text="Submit Trade", command=submit_trade)
-        submit_button.grid(row=len(offered_entries) + 2, column=1, columnspan=2)
+            if closest_vertex and min_dist < 20: # 20 is a tolerance
+                player = self.game.current_player
+                if self.building_mode == "settlement":
+                    success = self.game.build_settlement(player, closest_vertex)
+                    if success:
+                        messagebox.showinfo("Build", "Settlement built successfully!")
+                    else:
+                        messagebox.showerror("Build", "Failed to build settlement.")
+                elif self.building_mode == "city":
+                    success = self.game.build_city(player, closest_vertex)
+                    if success:
+                        messagebox.showinfo("Build", "City built successfully!")
+                    else:
+                        messagebox.showerror("Build", "Failed to build city.")
 
-    def build_road(self):
-        # This is a simplified version. We need to implement a way to get the
-        # location from the user.
-        location = "dummy_location"
-        if self.game.build_road(self.game.current_player, location):
-            messagebox.showinfo("Build Road", "Road built successfully!")
-            self.update_resource_labels()
-        else:
-            messagebox.showerror("Build Road", "Failed to build road.")
+        elif self.building_mode == "road":
+            # Find the closest edge
+            closest_edge = None
+            min_dist = float('inf')
+            for v1_id in self.game.board.graph.getVertices():
+                v1 = self.game.board.graph.getVertex(v1_id)
+                for v2 in v1.getConnections():
+                    v2_id = v2.getId()
+                    if v1_id < v2_id: # Avoid duplicates
+                        v1_loc = self.game.board.reverse_vertex_map[v1_id]
+                        v2_loc = self.game.board.reverse_vertex_map[v2_id]
+                        p1 = self.get_vertex_pixel(v1_loc)
+                        p2 = self.get_vertex_pixel(v2_loc)
+                        mid_point = Point((p1.x + p2.x) / 2, (p1.y + p2.y) / 2)
+                        dist = math.hypot(click_point.x - mid_point.x, click_point.y - mid_point.y)
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_edge = frozenset([v1_loc, v2_loc])
 
-    def build_settlement(self):
-        # This is a simplified version. We need to implement a way to get the
-        # location from the user.
-        location = "dummy_location"
-        if self.game.build_settlement(self.game.current_player, location):
-            messagebox.showinfo("Build Settlement", "Settlement built successfully!")
-            self.update_resource_labels()
-        else:
-            messagebox.showerror("Build Settlement", "Failed to build settlement.")
+            if closest_edge and min_dist < 20:
+                player = self.game.current_player
+                success = self.game.build_road(player, closest_edge)
+                if success:
+                    messagebox.showinfo("Build", "Road built successfully!")
+                else:
+                    messagebox.showerror("Build", "Failed to build road.")
 
-    def build_city(self):
-        # This is a simplified version. We need to implement a way to get the
-        # location from the user.
-        location = "dummy_location"
-        if self.game.build_city(self.game.current_player, location):
-            messagebox.showinfo("Build City", "City built successfully!")
-            self.update_resource_labels()
-        else:
-            messagebox.showerror("Build City", "Failed to build city.")
+        self.building_mode = None
+        self.update_resource_labels()
+        self.draw_board()
 
 if __name__ == "__main__":
     root = tk.Tk()

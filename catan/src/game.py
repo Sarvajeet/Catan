@@ -1,6 +1,7 @@
 import random
 from catan.src.board import Board
 from catan.src.player import Player
+from catan.src.components import Resource
 
 class Game:
     def __init__(self, player_names):
@@ -24,20 +25,22 @@ class Game:
         die1 = random.randint(1, 6)
         die2 = random.randint(1, 6)
         roll = die1 + die2
-        self.distribute_resources(roll)
+        if roll == 7:
+            # Robber logic will be implemented later
+            pass
+        else:
+            self.distribute_resources(roll)
         return roll
 
     def distribute_resources(self, roll):
-        for tile in self.board.tiles:
-            if tile.number == roll:
+        for hex_coord, tile in self.board.tiles.items():
+            if tile.number == roll and tile.resource is not None:
                 for player in self.players:
-                    for settlement in player.settlements:
-                        # Check if the settlement is adjacent to the tile
-                        if tile in self.board.get_tiles_for_settlement(settlement):
+                    for settlement_location in player.settlements:
+                        if hex_coord in settlement_location:
                             player.resources[tile.resource] += 1
-                    for city in player.cities:
-                        # Check if the city is adjacent to the tile
-                        if tile in self.board.get_tiles_for_settlement(city):
+                    for city_location in player.cities:
+                        if hex_coord in city_location:
                             player.resources[tile.resource] += 2
 
     def next_turn(self):
@@ -67,21 +70,109 @@ class Game:
         return True
 
     def build_road(self, player, location):
-        # This is a simplified version. We need to implement a way to check
-        # if the location is valid and if the player has the resources.
+        # location is a frozenset of two vertex identifiers
+        if not isinstance(location, frozenset) or len(location) != 2:
+            return False  # Invalid road location
+
+        # Check resources
+        required_resources = {Resource.BRICK: 1, Resource.LUMBER: 1}
+        for resource, amount in required_resources.items():
+            if player.resources[resource] < amount:
+                return False  # Not enough resources
+
+        # Check if the edge is already occupied
+        for p in self.players:
+            if location in p.roads:
+                return False  # Road already built
+
+        # Check connectivity
+        # The road must be connected to one of the player's existing roads, settlements, or cities.
+        v1, v2 = tuple(location)
+        is_connected = False
+
+        # Check for connection to settlements or cities
+        if v1 in player.settlements or v1 in player.cities or v2 in player.settlements or v2 in player.cities:
+            is_connected = True
+
+        # Check for connection to other roads
+        if not is_connected:
+            for road in player.roads:
+                if v1 in road or v2 in road:
+                    is_connected = True
+                    break
+
+        # The setup phase is not fully implemented. This check assumes that a road must be connected
+        # to a settlement if it's the first road.
+        if not is_connected and len(player.roads) == 0 and len(player.settlements) == 0:
+            return False
+
+        if not is_connected:
+            return False
+
+        # All checks passed, build the road
+        for resource, amount in required_resources.items():
+            player.resources[resource] -= amount
+
         player.roads.append(location)
         return True
 
     def build_settlement(self, player, location):
-        # This is a simplified version. We need to implement a way to check
-        # if the location is valid and if the player has the resources.
+        # location is a frozenset of Hex objects
+        # Check resources
+        required_resources = {Resource.BRICK: 1, Resource.LUMBER: 1, Resource.WOOL: 1, Resource.GRAIN: 1}
+        for resource, amount in required_resources.items():
+            if player.resources[resource] < amount:
+                return False  # Not enough resources
+
+        # Check distance rule
+        # Check if location is already occupied
+        for p in self.players:
+            if location in p.settlements or location in p.cities:
+                return False  # Location already occupied
+
+        # Check if adjacent vertices are occupied
+        adjacent_vertices = self.board.get_vertices_for_settlement(location)
+        for v in adjacent_vertices:
+            for p in self.players:
+                if v in p.settlements or v in p.cities:
+                    return False  # Too close to another settlement/city
+
+        # Check road connectivity (not enforced during setup phase)
+        is_setup_phase = len(player.settlements) < 2
+        if not is_setup_phase:
+            road_connected = False
+            for road in player.roads:
+                if location in road:
+                    road_connected = True
+                    break
+            if not road_connected:
+                return False
+
+        # All checks passed, build the settlement
+        for resource, amount in required_resources.items():
+            player.resources[resource] -= amount
+
         player.settlements.append(location)
         player.victory_points += 1
         return True
 
     def build_city(self, player, location):
-        # This is a simplified version. We need to implement a way to check
-        # if the location is valid and if the player has the resources.
+        # location is a frozenset of Hex objects
+        # Check resources
+        required_resources = {Resource.GRAIN: 2, Resource.ORE: 3}
+        for resource, amount in required_resources.items():
+            if player.resources[resource] < amount:
+                return False  # Not enough resources
+
+        # Check if player has a settlement at the location
+        if location not in player.settlements:
+            return False  # No settlement to upgrade
+
+        # All checks passed, build the city
+        for resource, amount in required_resources.items():
+            player.resources[resource] -= amount
+
+        player.settlements.remove(location)
         player.cities.append(location)
-        player.victory_points += 1
+        player.victory_points += 1  # +1 for upgrading settlement to city
         return True
