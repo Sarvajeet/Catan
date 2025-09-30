@@ -12,3 +12,7 @@ class Player:
         self.cities = []
         self.roads = []
         self.victory_points = 0
+        self.harbors = []
+        self.development_cards = []
+        self.new_development_cards = []
+        self.knights = 0

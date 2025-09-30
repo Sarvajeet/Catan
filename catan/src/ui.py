@@ -1,188 +1,236 @@
-import tkinter as tk
-from tkinter import messagebox
+import sys
 from catan.src.game import Game
-import math
+from catan.src.player import Player
+from catan.src.components import Resource
 
-class CatanUI:
-    def __init__(self, master):
-        self.master = master
-        self.master.title("Catan")
-
+class CatanTextUI:
+    def __init__(self):
         self.game = Game(player_names=["Player 1", "Player 2", "Player 3"])
+        self._setup_game()
 
-        self.canvas = tk.Canvas(master, width=800, height=600, bg='lightblue')
-        self.canvas.pack()
-
-        self.draw_board()
-
-        self.current_player_label = tk.Label(master, text=f"Current Player: {self.game.current_player.name}")
-        self.current_player_label.pack()
-
-        self.roll_button = tk.Button(master, text="Roll Dice", command=self.roll_dice)
-        self.roll_button.pack()
-
-        self.next_turn_button = tk.Button(master, text="Next Turn", command=self.next_turn)
-        self.next_turn_button.pack()
-
-        self.trade_button = tk.Button(master, text="Trade", command=self.open_trade_window)
-        self.trade_button.pack()
-
-        self.build_road_button = tk.Button(master, text="Build Road", command=self.build_road)
-        self.build_road_button.pack()
-
-        self.build_settlement_button = tk.Button(master, text="Build Settlement", command=self.build_settlement)
-        self.build_settlement_button.pack()
-
-        self.build_city_button = tk.Button(master, text="Build City", command=self.build_city)
-        self.build_city_button.pack()
-
-        self.player_frames = []
-        for i in range(4):
-            frame = tk.Frame(self.master)
-            self.player_frames.append(frame)
-
-        self.player_frames[0].pack(side=tk.TOP, fill=tk.X)
-        self.player_frames[1].pack(side=tk.BOTTOM, fill=tk.X)
-        self.player_frames[2].pack(side=tk.LEFT, fill=tk.Y)
-        self.player_frames[3].pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.resource_labels = []
-        for i, player in enumerate(self.game.players):
-            label = tk.Label(self.player_frames[i], text=f"{player.name}'s Resources: {player.resources}")
-            label.pack()
-            self.resource_labels.append(label)
-
-        self.trade_card_frame = tk.Frame(self.master)
-        self.trade_card_frame.pack(side=tk.BOTTOM, fill=tk.X)
-
-        self.trade_card_labels = {}
-        for resource in self.game.players[0].resources.keys():
-            label = tk.Label(self.trade_card_frame, text=f"{resource.name}: 0")
-            label.pack(side=tk.LEFT)
-            self.trade_card_labels[resource] = label
-
-    def draw_board(self):
-        # This is a simplified representation of the board.
-        # We will improve this later.
-        x, y = 100, 100
-        size = 30
-        for i, tile in enumerate(self.game.board.tiles):
-            x_pos = x + (i % 5) * 60
-            y_pos = y + (i // 5) * 60
-            self.canvas.create_oval(x_pos, y_pos, x_pos + 50, y_pos + 50, fill=self.get_tile_color(tile.resource))
-            self.canvas.create_text(x_pos + 25, y_pos + 25, text=f"{tile.number}\n{tile.resource.name if tile.resource else 'Desert'}")
-
-    def get_tile_color(self, resource):
-        if resource is None:
-            return "beige"
-        return {
-            "lumber": "forestgreen",
-            "wool": "lightgray",
-            "grain": "gold",
-            "brick": "firebrick",
-            "ore": "darkgray"
-        }.get(resource.value, "white")
-
-    def get_hexagon_points(self, x, y, size):
-        return [
-            x, y + size,
-            x + size * math.sqrt(3) / 2, y + size / 2,
-            x + size * math.sqrt(3) / 2, y - size / 2,
-            x, y - size,
-            x - size * math.sqrt(3) / 2, y - size / 2,
-            x - size * math.sqrt(3) / 2, y + size / 2
+    def _setup_game(self):
+        # Simplified setup for now
+        initial_placements = [
+            # P1
+            {"settlement": 8, "road": (8, 9)},
+            {"settlement": 22, "road": (22, 21)},
+            # P2
+            {"settlement": 14, "road": (14, 13)},
+            {"settlement": 33, "road": (33, 32)},
+            # P3
+            {"settlement": 40, "road": (40, 41)},
+            {"settlement": 45, "road": (45, 46)},
         ]
+        self.game.start_game(initial_placements)
+        print("Catan game started!")
 
-    def roll_dice(self):
+    def run(self):
+        while not self.game.check_for_winner():
+            self.print_game_state()
+            self.take_turn()
+            self.game.next_turn()
+
+        winner = self.game.check_for_winner()
+        print(f"\n\nPlayer {winner.name} has won the game!")
+
+    def print_game_state(self):
+        print("\n" + "="*30)
+        print(f"Turn {self.game.turn}: Player {self.game.current_player.name}'s turn")
+        print("="*30)
+        for player in self.game.players:
+            self.print_player_info(player)
+        print("-" * 30)
+
+    def print_player_info(self, player):
+        print(f"{player.name} ({player.color}):")
+        print(f"  Victory Points: {player.victory_points}")
+        print(f"  Resources: {dict(player.resources)}")
+        print(f"  Development Cards: {len(player.development_cards)}")
+        print(f"  Knights: {player.knights}")
+
+    def take_turn(self):
+        player = self.game.current_player
+        print(f"\n{player.name}, it's your turn.")
+
+        # 1. Roll dice
+        input("Press Enter to roll the dice...")
         roll = self.game.roll_dice()
-        messagebox.showinfo("Dice Roll", f"You rolled a {roll}")
-        self.update_resource_labels()
+        print(f"You rolled a {roll}")
+        if roll == 7:
+            print("Robber activated!")
+            # Simplified robber action for now
+            print("The robber has been moved randomly.")
+        else:
+            print("Resources have been distributed.")
 
-    def update_resource_labels(self):
-        for i, player in enumerate(self.game.players):
-            self.resource_labels[i].config(text=f"{player.name}'s Resources: {player.resources}")
+        self.print_player_info(player)
 
-    def next_turn(self):
-        self.game.next_turn()
-        self.current_player_label.config(text=f"Current Player: {self.game.current_player.name}")
-
-    def open_trade_window(self):
-        trade_window = tk.Toplevel(self.master)
-        trade_window.title("Trade")
-
-        # Offered resources
-        tk.Label(trade_window, text="Offered Resources").grid(row=0, column=0)
-        offered_entries = {}
-        for i, resource in enumerate(self.game.players[0].resources.keys()):
-            tk.Label(trade_window, text=resource.name).grid(row=i + 1, column=0)
-            entry = tk.Entry(trade_window)
-            entry.grid(row=i + 1, column=1)
-            offered_entries[resource] = entry
-
-        # Requested resources
-        tk.Label(trade_window, text="Requested Resources").grid(row=0, column=2)
-        requested_entries = {}
-        for i, resource in enumerate(self.game.players[0].resources.keys()):
-            tk.Label(trade_window, text=resource.name).grid(row=i + 1, column=2)
-            entry = tk.Entry(trade_window)
-            entry.grid(row=i + 1, column=3)
-            requested_entries[resource] = entry
-
-        # Player selection
-        tk.Label(trade_window, text="Trade with:").grid(row=len(offered_entries) + 1, column=0)
-        player_names = [p.name for p in self.game.players if p != self.game.current_player]
-        selected_player = tk.StringVar(trade_window)
-        selected_player.set(player_names[0])
-        player_menu = tk.OptionMenu(trade_window, selected_player, *player_names)
-        player_menu.grid(row=len(offered_entries) + 1, column=1)
-
-        def submit_trade():
-            offered = {res: int(entry.get() or 0) for res, entry in offered_entries.items()}
-            requested = {res: int(entry.get() or 0) for res, entry in requested_entries.items()}
-
-            receiving_player = next(p for p in self.game.players if p.name == selected_player.get())
-
-            if self.game.trade(self.game.current_player, receiving_player, offered, requested):
-                messagebox.showinfo("Trade", "Trade successful!")
-                self.update_resource_labels()
-                trade_window.destroy()
+        # 2. Actions
+        while True:
+            action = input("\nChoose an action: [b]uild, [t]rade, [p]lay card, [e]nd turn: ").lower()
+            if action == 'b':
+                self.handle_build(player)
+            elif action == 't':
+                self.handle_trade(player)
+            elif action == 'p':
+                self.handle_play_card(player)
+            elif action == 'e':
+                break
             else:
-                messagebox.showerror("Trade", "Trade failed. Not enough resources.")
+                print("Invalid action.")
 
-        submit_button = tk.Button(trade_window, text="Submit Trade", command=submit_trade)
-        submit_button.grid(row=len(offered_entries) + 2, column=1, columnspan=2)
-
-    def build_road(self):
-        # This is a simplified version. We need to implement a way to get the
-        # location from the user.
-        location = "dummy_location"
-        if self.game.build_road(self.game.current_player, location):
-            messagebox.showinfo("Build Road", "Road built successfully!")
-            self.update_resource_labels()
+    def handle_build(self, player):
+        build_choice = input("What do you want to build? [r]oad, [s]ettlement, [c]ity, [d]ev card: ").lower()
+        if build_choice == 'r':
+            try:
+                loc1 = int(input("Enter road start vertex: "))
+                loc2 = int(input("Enter road end vertex: "))
+                if self.game.build_road(player, (loc1, loc2)):
+                    print("Road built successfully.")
+                else:
+                    print("Failed to build road.")
+            except ValueError:
+                print("Invalid vertex.")
+        elif build_choice == 's':
+            try:
+                loc = int(input("Enter settlement vertex: "))
+                if self.game.build_settlement(player, loc):
+                    print("Settlement built successfully.")
+                else:
+                    print("Failed to build settlement.")
+            except ValueError:
+                print("Invalid vertex.")
+        elif build_choice == 'c':
+            try:
+                loc = int(input("Enter city vertex: "))
+                if self.game.build_city(player, loc):
+                    print("City built successfully.")
+                else:
+                    print("Failed to build city.")
+            except ValueError:
+                print("Invalid vertex.")
+        elif build_choice == 'd':
+            if self.game.buy_development_card(player):
+                print("Development card purchased.")
+            else:
+                print("Failed to buy development card.")
         else:
-            messagebox.showerror("Build Road", "Failed to build road.")
+            print("Invalid build choice.")
 
-    def build_settlement(self):
-        # This is a simplified version. We need to implement a way to get the
-        # location from the user.
-        location = "dummy_location"
-        if self.game.build_settlement(self.game.current_player, location):
-            messagebox.showinfo("Build Settlement", "Settlement built successfully!")
-            self.update_resource_labels()
+    def handle_trade(self, player):
+        trade_type = input("Trade with [p]layer or [m]aritime? ").lower()
+        if trade_type == 'p':
+            self.handle_player_trade(player)
+        elif trade_type == 'm':
+            self.handle_maritime_trade(player)
         else:
-            messagebox.showerror("Build Settlement", "Failed to build settlement.")
+            print("Invalid trade type.")
 
-    def build_city(self):
-        # This is a simplified version. We need to implement a way to get the
-        # location from the user.
-        location = "dummy_location"
-        if self.game.build_city(self.game.current_player, location):
-            messagebox.showinfo("Build City", "City built successfully!")
-            self.update_resource_labels()
+    def handle_player_trade(self, player):
+        other_player_name = input("Enter player name to trade with: ")
+        other_player = next((p for p in self.game.players if p.name == other_player_name), None)
+        if not other_player:
+            print("Player not found.")
+            return
+
+        print("Enter resources to offer (e.g., 'lumber 1, brick 2'):")
+        offered_str = input("> ")
+        print("Enter resources to request:")
+        requested_str = input("> ")
+
+        try:
+            offered_resources = self._parse_resources(offered_str)
+            requested_resources = self._parse_resources(requested_str)
+        except ValueError:
+            print("Invalid resource format.")
+            return
+
+        if self.game.trade(player, other_player, offered_resources, requested_resources):
+            print("Trade successful.")
         else:
-            messagebox.showerror("Build City", "Failed to build city.")
+            print("Trade failed.")
+
+    def handle_maritime_trade(self, player):
+        resource_to_give_str = input("Enter resource to give: ").upper()
+        resource_to_get_str = input("Enter resource to get: ").upper()
+        try:
+            resource_to_give = Resource[resource_to_give_str]
+            resource_to_get = Resource[resource_to_get_str]
+        except KeyError:
+            print("Invalid resource name.")
+            return
+
+        if self.game.maritime_trade(player, resource_to_give, resource_to_get):
+            print("Maritime trade successful.")
+        else:
+            print("Maritime trade failed.")
+
+    def handle_play_card(self, player):
+        if not player.development_cards:
+            print("You have no development cards to play.")
+            return
+
+        print("Your development cards:")
+        for i, card in enumerate(player.development_cards):
+            print(f"  {i}: {card.name}")
+
+        try:
+            choice = int(input("Choose a card to play: "))
+            card = player.development_cards[choice]
+        except (ValueError, IndexError):
+            print("Invalid choice.")
+            return
+
+        kwargs = {}
+        if card.name == "Knight":
+            try:
+                new_loc = int(input("Enter new robber location (tile index): "))
+                kwargs['new_location'] = new_loc
+                # Add logic to choose a player to steal from if applicable
+            except ValueError:
+                print("Invalid location.")
+                return
+        elif card.name == "Monopoly":
+            res_str = input("Enter resource to monopolize: ").upper()
+            try:
+                kwargs['resource'] = Resource[res_str]
+            except KeyError:
+                print("Invalid resource.")
+                return
+        elif card.name == "Road Building":
+            try:
+                r1_v1 = int(input("Enter road 1 start vertex: "))
+                r1_v2 = int(input("Enter road 1 end vertex: "))
+                r2_v1 = int(input("Enter road 2 start vertex: "))
+                r2_v2 = int(input("Enter road 2 end vertex: "))
+                kwargs['road1_loc'] = (r1_v1, r1_v2)
+                kwargs['road2_loc'] = (r2_v1, r2_v2)
+            except ValueError:
+                print("Invalid vertex.")
+                return
+        elif card.name == "Year of Plenty":
+            try:
+                res1_str = input("Enter first resource to take: ").upper()
+                res2_str = input("Enter second resource to take: ").upper()
+                kwargs['resource1'] = Resource[res1_str]
+                kwargs['resource2'] = Resource[res2_str]
+            except KeyError:
+                print("Invalid resource.")
+                return
+
+        if self.game.play_development_card(player, card, **kwargs):
+            print(f"{card.name} card played successfully.")
+        else:
+            print("Failed to play card.")
+
+    def _parse_resources(self, resources_str):
+        resources = {}
+        parts = resources_str.split(',')
+        for part in parts:
+            name, amount = part.strip().split()
+            resources[Resource[name.upper()]] = int(amount)
+        return resources
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = CatanUI(root)
-    root.mainloop()
+    ui = CatanTextUI()
+    ui.run()
