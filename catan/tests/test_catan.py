@@ -104,9 +104,16 @@ class TestGame(unittest.TestCase):
         self.assertNotIn(card, self.player1.development_cards)
 
     def test_win_condition(self):
-        self.player1.victory_points = 9
+        # Test that a player with less than 10 VP is not the winner
+        self.player1.settlements = [1, 2, 3]
+        self.player1.cities = [4, 5] # 3 * 1 + 2 * 2 = 7 VP
+        self.assertEqual(self.player1.victory_points, 7)
         self.assertIsNone(self.game.check_for_winner())
-        self.player1.victory_points = 10
+
+        # Test that a player with 10 VP is the winner
+        self.player1.cities.append(6) # 3 * 1 + 3 * 2 = 9 VP
+        self.player1.has_largest_army = True # 9 + 2 = 11 VP
+        self.assertEqual(self.player1.victory_points, 11)
         self.assertEqual(self.game.check_for_winner(), self.player1)
 
 if __name__ == '__main__':

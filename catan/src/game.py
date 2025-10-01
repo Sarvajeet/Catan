@@ -1,3 +1,4 @@
+from collections import defaultdict
 import random
 from catan.src.board import Board
 from catan.src.player import Player
@@ -148,6 +149,12 @@ class Game:
                             player.resources[tile.resource] += 2
 
     def next_turn(self):
+        # Move new development cards to the player's hand
+        self.current_player.development_cards.extend(self.current_player.new_development_cards)
+        self.current_player.new_development_cards = []
+
+        self.check_for_winner()
+
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
         self.turn += 1
 
@@ -220,7 +227,6 @@ class Game:
             player.resources[Resource.GRAIN] -= 1
 
         player.settlements.append(location)
-        player.victory_points += 1
 
         # Check for harbors
         for harbor in self.board.harbors:
@@ -230,8 +236,6 @@ class Game:
         return True
 
     def build_city(self, player, location):
-        # This is a simplified version. We need to implement a way to check
-        # if the location is valid and if the player has the resources.
         if location not in player.settlements:
             return False  # Must build on an existing settlement
 
@@ -243,7 +247,6 @@ class Game:
 
         player.settlements.remove(location)
         player.cities.append(location)
-        player.victory_points += 1
         return True
 
     def maritime_trade(self, player, resource_to_give, resource_to_get):
@@ -333,38 +336,86 @@ class Game:
         self.current_player_index = (self.current_player_index + 1) % len(self.players)
         self.turn += 1
 
+    def trade(self, offering_player, receiving_player, offered_resources, requested_resources):
+        # Check if the offering player has the resources to trade
+        for resource, amount in offered_resources.items():
+            if offering_player.resources[resource] < amount:
+                return False
+
+        # Check if the receiving player has the resources to trade
+        for resource, amount in requested_resources.items():
+            if receiving_player.resources[resource] < amount:
+                return False
+
+        # Perform the trade
+        for resource, amount in offered_resources.items():
+            offering_player.resources[resource] -= amount
+            receiving_player.resources[resource] += amount
+
+        for resource, amount in requested_resources.items():
+            receiving_player.resources[resource] -= amount
+            offering_player.resources[resource] += amount
+
+        return True
+
+    def _calculate_longest_road(self, player):
+        if not player.roads:
+            return 0
+
+        adj = defaultdict(list)
+        for r1, r2 in player.roads:
+            adj[r1].append(r2)
+            adj[r2].append(r1)
+
+        max_len = 0
+
+        for start_node in adj:
+            # Only start DFS from endpoints of road segments to be efficient
+            if len(adj[start_node]) == 1:
+                visited = set()
+
+                def dfs(node, length):
+                    nonlocal max_len
+                    visited.add(node)
+                    max_len = max(max_len, length)
+                    for neighbor in adj[node]:
+                        if neighbor not in visited:
+                            dfs(neighbor, length + 1)
+
+                dfs(start_node, 1)
+
+        # The above DFS calculates nodes, but road length is edges.
+        # If there are nodes, there's at least one road segment.
+        return max_len -1 if max_len > 0 else 0
+
+
     def _update_longest_road(self, player):
-        # This is a simplified version of longest road calculation.
-        # A full implementation would require a graph traversal algorithm (DFS/BFS).
-        road_length = len(player.roads)
+        road_length = self._calculate_longest_road(player)
 
         if road_length >= 5:
             if self.longest_road_player is None:
                 self.longest_road_player = player
-                player.victory_points += 2
-            elif road_length > len(self.longest_road_player.roads):
-                self.longest_road_player.victory_points -= 2
+                player.has_longest_road = True
+            elif player == self.longest_road_player:
+                # No change if current player already has the award
+                return
+            elif road_length > self._calculate_longest_road(self.longest_road_player):
+                self.longest_road_player.has_longest_road = False
                 self.longest_road_player = player
-                player.victory_points += 2
+                player.has_longest_road = True
 
     def _update_largest_army(self, player):
         if player.knights >= 3:
             if self.largest_army_player is None:
                 self.largest_army_player = player
-                player.victory_points += 2
+                player.has_largest_army = True
             elif player.knights > self.largest_army_player.knights:
-                self.largest_army_player.victory_points -= 2
+                self.largest_army_player.has_largest_army = False
                 self.largest_army_player = player
-                player.victory_points += 2
+                player.has_largest_army = True
 
     def check_for_winner(self):
         for player in self.players:
-            vp = player.victory_points
-            # Add victory points from cards
-            for card in player.development_cards + player.new_development_cards:
-                if isinstance(card, VictoryPointCard):
-                    vp += 1
-
-            if vp >= 10:
+            if player.victory_points >= 10:
                 return player
         return None

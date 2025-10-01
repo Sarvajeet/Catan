@@ -1,0 +1,152 @@
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#game-board {
+    position: relative;
+    width: 800px; /* Adjust as needed */
+    height: 700px; /* Adjust as needed */
+    margin: 0 auto;
+}
+
+.hex {
+    position: absolute;
+    width: 100px;
+    height: 115.47px; /* width * sqrt(3) / 2 * 2 */
+    background-color: #ccc;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    font-size: 12px;
+}
+
+.hex .resource {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.hex .number {
+    font-size: 20px;
+    margin-top: 5px;
+    background-color: white;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Resource Colors */
+.LUMBER { background-color: #228B22; } /* Forest Green */
+.BRICK { background-color: #B22222; } /* Firebrick */
+.WOOL { background-color: #F5F5DC; } /* Beige */
+.GRAIN { background-color: #FFD700; } /* Gold */
+.ORE { background-color: #808080; } /* Gray */
+.DESERT { background-color: #F0E68C; } /* Khaki */
+
+#players-container {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.player-info {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.player-info h3 {
+    margin-top: 0;
+}
+
+.player-info .resources {
+    list-style: none;
+    padding: 0;
+}
+
+/* Modal Styles */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0,0.4);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 500px;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-btn:hover,
+.close-btn:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.trade-resources {
+    display: flex;
+    justify-content: space-between;
+}
+
+.vertex {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    z-index: 2;
+}
+
+.vertex:hover {
+    background-color: white;
+}
+
+.vertex.settlement.red { background-color: red; }
+.vertex.settlement.blue { background-color: blue; }
+.vertex.settlement.green { background-color: green; }
+.vertex.settlement.yellow { background-color: #FFD700; }
+
+.vertex.city {
+    border-radius: 0; /* Make it a square */
+    width: 22px;
+    height: 22px;
+}
+
+.road {
+    position: absolute;
+    stroke-width: 5;
+    z-index: 1;
+}
+
+.road.red { stroke: red; }
+.road.blue { stroke: blue; }
+.road.green { stroke: green; }
+.road.yellow { stroke: #FFD700; }
