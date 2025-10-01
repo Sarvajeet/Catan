@@ -6,6 +6,7 @@ from flask import Flask, render_template, jsonify, request
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from catan.src.game import Game
+from catan.src.components import Resource
 
 app = Flask(__name__)
 

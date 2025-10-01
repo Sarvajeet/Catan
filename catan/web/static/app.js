@@ -123,8 +123,8 @@ document.addEventListener('DOMContentLoaded', () => {
         gameBoard.innerHTML = '';
         const hexWidth = 100;
         const hexHeight = 115.47;
-        const horizSpacing = hexWidth * 0.75;
-        const vertSpacing = hexHeight;
+        const horizDist = hexWidth * 0.75;
+        const vertDist = hexHeight * 0.866; // This is sqrt(3)/2 of the height, for row spacing
 
         const tileCoordinates = [
             [2, 0], [3, 0], [4, 0],
@@ -136,10 +136,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         vertexCoords = {};
 
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.style.position = 'absolute';
+        svg.style.top = '0';
+        svg.style.left = '0';
+        svg.style.width = '100%';
+        svg.style.height = '100%';
+        svg.style.zIndex = '1';
+        gameBoard.appendChild(svg);
+
         board.tiles.forEach((tile, i) => {
             const [col, row] = tileCoordinates[i];
-            const x = col * horizSpacing;
-            const y = row * (vertSpacing / 2);
+            const x = col * horizDist;
+            const y = row * vertDist;
 
             const hex = document.createElement('div');
             hex.classList.add('hex', tile.resource);
@@ -176,7 +185,26 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Render Vertices (for clicking)
+        // Render Player Roads
+        for (const playerName in players) {
+            const player = players[playerName];
+            player.roads.forEach(road => {
+                const [v1, v2] = road;
+                const pos1 = vertexCoords[v1];
+                const pos2 = vertexCoords[v2];
+                if (pos1 && pos2) {
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', pos1.x);
+                    line.setAttribute('y1', pos1.y);
+                    line.setAttribute('x2', pos2.x);
+                    line.setAttribute('y2', pos2.y);
+                    line.classList.add('road', player.color);
+                    svg.appendChild(line);
+                }
+            });
+        }
+
+        // Render Vertices (for clicking and showing settlements/cities)
         for (const vertexId in vertexCoords) {
             const pos = vertexCoords[vertexId];
             const vertexDiv = document.createElement('div');
@@ -186,40 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
             vertexDiv.dataset.id = vertexId;
             vertexDiv.title = `Vertex ${vertexId}`;
             vertexDiv.addEventListener('click', () => onVertexClick(vertexId));
-            gameBoard.appendChild(vertexDiv);
-        }
 
-        // Render Player Pieces
-        for (const playerName in players) {
-            const player = players[playerName];
-
-            player.settlements.forEach(vertexId => {
-                const vertexDiv = document.querySelector(`.vertex[data-id='${vertexId}']`);
-                if(vertexDiv) vertexDiv.classList.add('settlement', player.color);
-            });
-
-            player.cities.forEach(vertexId => {
-                const vertexDiv = document.querySelector(`.vertex[data-id='${vertexId}']`);
-                if(vertexDiv) vertexDiv.classList.add('city', player.color);
-            });
-
-            player.roads.forEach(road => {
-                const [v1, v2] = road;
-                const pos1 = vertexCoords[v1];
-                const pos2 = vertexCoords[v2];
-                if (pos1 && pos2) {
-                    const roadSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                    roadSvg.classList.add('road');
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', pos1.x);
-                    line.setAttribute('y1', pos1.y);
-                    line.setAttribute('x2', pos2.x);
-                    line.setAttribute('y2', pos2.y);
-                    line.classList.add('road', player.color);
-                    roadSvg.appendChild(line);
-                    gameBoard.appendChild(roadSvg);
+            for (const playerName in players) {
+                const player = players[playerName];
+                if (player.settlements.includes(parseInt(vertexId))) {
+                    vertexDiv.classList.add('settlement', player.color);
                 }
-            });
+                if (player.cities.includes(parseInt(vertexId))) {
+                    vertexDiv.classList.add('city', player.color);
+                }
+            }
+            gameBoard.appendChild(vertexDiv);
         }
     }
 
@@ -252,7 +257,6 @@ document.addEventListener('DOMContentLoaded', () => {
             li.textContent = msg;
             gameLog.appendChild(li);
         });
-        // Auto-scroll to the bottom
         gameLog.parentElement.scrollTop = gameLog.parentElement.scrollHeight;
     }
 
