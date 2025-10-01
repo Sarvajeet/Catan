@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tradeModal = document.getElementById('trade-modal');
     const closeBtn = document.querySelector('.close-btn');
     const tradeForm = document.getElementById('trade-form');
+    const gameLog = document.getElementById('game-log');
 
     // --- Game State ---
     let currentPlayers = [];
@@ -67,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentPlayerName = data.currentPlayer;
                 renderBoard(data.board, data.players);
                 renderPlayers(data.players);
+                renderLog(data.log);
             });
     }
 
@@ -241,6 +243,17 @@ document.addEventListener('DOMContentLoaded', () => {
             playerDiv.appendChild(resourcesList);
             playersContainer.appendChild(playerDiv);
         }
+    }
+
+    function renderLog(logMessages) {
+        gameLog.innerHTML = '';
+        logMessages.forEach(msg => {
+            const li = document.createElement('li');
+            li.textContent = msg;
+            gameLog.appendChild(li);
+        });
+        // Auto-scroll to the bottom
+        gameLog.parentElement.scrollTop = gameLog.parentElement.scrollHeight;
     }
 
     // --- Trade Modal Logic ---

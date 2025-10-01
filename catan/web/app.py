@@ -45,7 +45,8 @@ def game_state():
             ],
             'robber_location': game.board.robber_location,
             'tile_to_vertices': game.board.tile_to_vertices,
-        }
+        },
+        'log': game.log
     }
     return jsonify(state)
 

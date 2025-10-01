@@ -17,6 +17,7 @@ class Game:
         self.players = [Player(name, color) for name, color in zip(player_names, ["red", "blue", "green", "yellow"])]
         self.current_player_index = 0
         self.turn = 0
+        self.log = ["Game created."]
         self.longest_road_player = None
         self.largest_army_player = None
         self._create_development_card_deck()
@@ -57,9 +58,10 @@ class Game:
         die1 = random.randint(1, 6)
         die2 = random.randint(1, 6)
         roll = die1 + die2
+        self.log.append(f"{self.current_player.name} rolled a {roll}.")
 
         if roll == 7:
-            # Handle robber logic
+            self.log.append("A 7 was rolled! The robber is activated.")
             self.handle_robber()
         else:
             self.distribute_resources(roll)
@@ -133,20 +135,34 @@ class Game:
         return players_on_tile
 
     def distribute_resources(self, roll):
+        gains = defaultdict(lambda: defaultdict(int))
         for i, tile in enumerate(self.board.tiles):
-            if i == self.board.robber_location:
-                continue  # No resources from the tile with the robber
+            if i == self.board.robber_location or tile.resource is None or tile.number != roll:
+                continue
 
-            if tile.number == roll:
-                for player in self.players:
-                    for settlement in player.settlements:
-                        # Check if the settlement is adjacent to the tile
-                        if tile in self.board.get_tiles_for_settlement(settlement):
-                            player.resources[tile.resource] += 1
-                    for city in player.cities:
-                        # Check if the city is adjacent to the tile
-                        if tile in self.board.get_tiles_for_settlement(city):
-                            player.resources[tile.resource] += 2
+            for player in self.players:
+                vertices_on_tile = self.board.tile_to_vertices.get(i, [])
+                for settlement_loc in player.settlements:
+                    if settlement_loc in vertices_on_tile:
+                        gains[player.name][tile.resource] += 1
+
+                for city_loc in player.cities:
+                    if city_loc in vertices_on_tile:
+                        gains[player.name][tile.resource] += 2
+
+        if not gains:
+            self.log.append("No resources were distributed.")
+            return
+
+        for player in self.players:
+            if player.name in gains:
+                log_parts = []
+                for resource, amount in gains[player.name].items():
+                    if amount > 0:
+                        player.resources[resource] += amount
+                        log_parts.append(f"{amount} {resource.name}")
+                if log_parts:
+                    self.log.append(f"{player.name} received {', '.join(log_parts)}.")
 
     def next_turn(self):
         # Move new development cards to the player's hand
@@ -178,6 +194,27 @@ class Game:
             receiving_player.resources[resource] -= amount
             offering_player.resources[resource] += amount
 
+        offered_str = ', '.join([f'{v} {k.name}' for k, v in offered_resources.items()])
+        requested_str = ', '.join([f'{v} {k.name}' for k, v in requested_resources.items()])
+        self.log.append(f"{offering_player.name} traded {offered_str} to {receiving_player.name} for {requested_str}.")
+
+        return True
+
+    def maritime_trade(self, player, resource_to_give, resource_to_get):
+        # Check for the best trade ratio for the resource to give
+        trade_ratio = 4  # Default ratio
+        for harbor in player.harbors:
+            if harbor.resource is None:  # 3:1 harbor
+                trade_ratio = min(trade_ratio, 3)
+            elif harbor.resource == resource_to_give:  # 2:1 harbor
+                trade_ratio = min(trade_ratio, 2)
+
+        if player.resources[resource_to_give] < trade_ratio:
+            return False
+
+        player.resources[resource_to_give] -= trade_ratio
+        player.resources[resource_to_get] += 1
+        self.log.append(f"{player.name} performed a maritime trade, giving {trade_ratio} {resource_to_give.name} for 1 {resource_to_get.name}.")
         return True
 
     def _is_valid_settlement_location(self, player, location):
@@ -209,6 +246,7 @@ class Game:
             return False
 
         player.roads.append(location)
+        self.log.append(f"{player.name} built a road.")
         self._update_longest_road(player)
         return True
 
@@ -227,6 +265,7 @@ class Game:
             player.resources[Resource.GRAIN] -= 1
 
         player.settlements.append(location)
+        self.log.append(f"{player.name} built a settlement at vertex {location}.")
 
         # Check for harbors
         for harbor in self.board.harbors:
@@ -247,6 +286,7 @@ class Game:
 
         player.settlements.remove(location)
         player.cities.append(location)
+        self.log.append(f"{player.name} built a city at vertex {location}.")
         return True
 
     def maritime_trade(self, player, resource_to_give, resource_to_get):
@@ -293,19 +333,21 @@ class Game:
 
         card = self.development_card_deck.pop()
         player.new_development_cards.append(card)
+        self.log.append(f"{player.name} bought a development card.")
         return True
 
     def play_development_card(self, player, card, **kwargs):
         if card not in player.development_cards:
             return False # Player doesn't have this card
 
+        self.log.append(f"{player.name} played a {card.name} card.")
         if isinstance(card, KnightCard):
             player.knights += 1
             self.move_robber(player, kwargs['new_location'], kwargs.get('target_player'))
             self._update_largest_army(player)
         elif isinstance(card, VictoryPointCard):
-            # Victory points are hidden until the end of the game
-            # We will handle this in the game end condition
+            # This is a passive card, the VP is calculated automatically.
+            # No specific action to log here other than the card was played.
             pass
         elif isinstance(card, MonopolyCard):
             resource = kwargs['resource']
@@ -313,15 +355,21 @@ class Game:
             for p in self.players:
                 if p != player:
                     amount = p.resources[resource]
-                    p.resources[resource] = 0
-                    total_stolen += amount
+                    if amount > 0:
+                        p.resources[resource] = 0
+                        total_stolen += amount
             player.resources[resource] += total_stolen
+            self.log.append(f"{player.name} monopolized {resource.name}, taking {total_stolen} from other players.")
         elif isinstance(card, RoadBuildingCard):
             self.build_road(player, kwargs['road1_loc'], is_setup=True)
             self.build_road(player, kwargs['road2_loc'], is_setup=True)
+            self.log.append(f"{player.name} built two free roads.")
         elif isinstance(card, YearOfPlentyCard):
-            player.resources[kwargs['resource1']] += 1
-            player.resources[kwargs['resource2']] += 1
+            res1 = kwargs['resource1']
+            res2 = kwargs['resource2']
+            player.resources[res1] += 1
+            player.resources[res2] += 1
+            self.log.append(f"{player.name} took 1 {res1.name} and 1 {res2.name} from the bank.")
 
         player.development_cards.remove(card)
         return True
