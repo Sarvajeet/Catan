@@ -467,3 +467,35 @@ class Game:
             if player.victory_points >= 10:
                 return player
         return None
+
+    def to_dict(self):
+        return {
+            'currentPlayer': self.current_player.name,
+            'current_player_index': self.current_player_index,
+            'turn': self.turn,
+            'players': {
+                p.name: {
+                    'resources': {res.name: count for res, count in p.resources.items()},
+                    'settlements': p.settlements,
+                    'cities': p.cities,
+                    'roads': p.roads,
+                    'color': p.color,
+                    'victory_points': p.victory_points,
+                    'knights': p.knights,
+                    'development_cards_count': len(p.development_cards),
+                    'has_longest_road': p.has_longest_road,
+                    'has_largest_army': p.has_largest_army
+                } for p in self.players
+            },
+            'board': {
+                'tiles': [
+                    {
+                        'resource': tile.resource.name if tile.resource else 'DESERT',
+                        'number': tile.number
+                    } for tile in self.board.tiles
+                ],
+                'robber_location': self.board.robber_location,
+                'tile_to_vertices': {str(k): v for k, v in self.board.tile_to_vertices.items()}, # Convert keys to string for JSON
+            },
+            'log': self.log
+        }
