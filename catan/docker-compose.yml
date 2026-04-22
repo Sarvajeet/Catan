@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: catan
+      POSTGRES_PASSWORD: catan
+      POSTGRES_DB: catan
+    volumes:
+      - catan-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catan"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      CATAN_SECRET: ${CATAN_SECRET:-change-me-please}
+      CATAN_CORS: ${CATAN_CORS:-*}
+      DATABASE_URL: postgresql+psycopg://catan:catan@db:5432/catan
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+
+volumes:
+  catan-db:
