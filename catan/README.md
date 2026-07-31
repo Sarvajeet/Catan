@@ -137,6 +137,30 @@ The `app` service runs Flask + Gunicorn (eventlet worker) on port 5001 and the
 `db` service runs Postgres. The first-time database schema is created on
 startup; set `CATAN_SECRET` in a `.env` file for a real deployment.
 
+## Deploy to Render (free)
+
+A [`render.yaml`](../render.yaml) blueprint is included at the repo root. To go live:
+
+1. Push this repo to GitHub (Render deploys from a connected repo).
+2. In the [Render dashboard](https://dashboard.render.com), click **New + → Blueprint**
+   and pick this repository. Render reads `render.yaml` and creates a free Docker
+   web service (`catan-online`) with a generated `CATAN_SECRET`.
+3. Click **Apply**. First build takes a few minutes; your game is then live at
+   `https://catan-online.onrender.com` (or whatever name Render assigns).
+
+Caveats of the free plan:
+
+- The instance **spins down after ~15 min idle** (~30s cold start on the next
+  visit). Because rooms are in-memory, any in-progress game is lost on spin-down
+  — players just create a new room.
+- Keep it at **one instance** (rooms are single-process; do not scale up).
+- No database is provisioned, so accounts/stats use **ephemeral SQLite** that
+  resets on each deploy. To persist them, uncomment the `databases` block and the
+  `DATABASE_URL` env var in `render.yaml` (Render's free Postgres works).
+
+The `Dockerfile` binds `$PORT` (injected by Render), so the same image runs
+locally via `docker compose` and on Render unchanged.
+
 ## Environment variables
 
 | Variable | Default | Purpose |

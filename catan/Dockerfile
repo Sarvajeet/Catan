@@ -38,5 +38,6 @@ WORKDIR /app
 ENV FLASK_APP=catan.web.app:app
 EXPOSE 5001
 
-# Gunicorn with the eventlet worker supports Socket.IO websockets.
-CMD ["gunicorn", "-k", "eventlet", "-w", "1", "-b", "0.0.0.0:5001", "catan.web.app:app"]
+# Gunicorn with the eventlet worker supports Socket.IO websockets. Shell form so
+# $PORT expands — hosts like Render inject a dynamic port; falls back to 5001.
+CMD gunicorn -k eventlet -w 1 -b 0.0.0.0:${PORT:-5001} catan.web.app:app
