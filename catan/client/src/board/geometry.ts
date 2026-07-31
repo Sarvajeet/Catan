@@ -97,6 +97,17 @@ export const RESOURCE_FILL: Record<string, string> = {
   DESERT: "#d9b26b",
 };
 
+// Lighter shade of each resource color, used as the top stop of the per-hex
+// SVG gradients so tiles read with depth instead of flat fills.
+export const RESOURCE_FILL_LIGHT: Record<string, string> = {
+  LUMBER: "#3c9140",
+  BRICK: "#d06a44",
+  WOOL: "#a8dd6e",
+  GRAIN: "#f4cd6a",
+  ORE: "#8b95a3",
+  DESERT: "#ecd29a",
+};
+
 // Unicode glyphs rendered on each tile to make resources instantly identifiable.
 export const RESOURCE_ICON: Record<string, string> = {
   LUMBER: "\uD83C\uDF32", // evergreen tree

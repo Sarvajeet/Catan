@@ -4,41 +4,44 @@ from catan.src.components import Harbor, Resource, Tile
 from catan.src.graph import Graph
 
 
-# Canonical 19-hex Catan layout. Vertex ids 0..53 are assigned row-by-row
-# from the top-left corner of the board.
+# Canonical 19-hex Catan layout. The 54 vertex ids are numbered row-by-row
+# (top-to-bottom, left-to-right) over the physical board, and each tile lists
+# its six vertices in clockwise corner order. This mapping is a valid planar
+# hex tessellation: every vertex touches at most 3 tiles and has degree <= 3.
 TILE_TO_VERTICES = {
-    0: [0, 1, 2, 10, 9, 8],
-    1: [2, 3, 4, 12, 11, 10],
-    2: [4, 5, 6, 14, 13, 12],
-    3: [7, 8, 9, 19, 18, 17],
-    4: [9, 10, 11, 21, 20, 19],
-    5: [11, 12, 13, 23, 22, 21],
-    6: [13, 14, 15, 25, 24, 23],
-    7: [17, 18, 19, 30, 29, 28],
-    8: [19, 20, 21, 32, 31, 30],
-    9: [21, 22, 23, 34, 33, 32],
-    10: [23, 24, 25, 36, 35, 34],
-    11: [25, 26, 27, 38, 37, 36],
-    12: [29, 30, 31, 41, 40, 39],
-    13: [31, 32, 33, 43, 42, 41],
-    14: [33, 34, 35, 45, 44, 43],
-    15: [35, 36, 37, 47, 46, 45],
-    16: [40, 41, 42, 50, 49, 48],
-    17: [42, 43, 44, 52, 51, 50],
-    18: [44, 45, 46, 53, 52, 51],
+    0: [4, 8, 12, 7, 3, 0],
+    1: [5, 9, 13, 8, 4, 1],
+    2: [6, 10, 14, 9, 5, 2],
+    3: [12, 17, 22, 16, 11, 7],
+    4: [13, 18, 23, 17, 12, 8],
+    5: [14, 19, 24, 18, 13, 9],
+    6: [15, 20, 25, 19, 14, 10],
+    7: [22, 28, 33, 27, 21, 16],
+    8: [23, 29, 34, 28, 22, 17],
+    9: [24, 30, 35, 29, 23, 18],
+    10: [25, 31, 36, 30, 24, 19],
+    11: [26, 32, 37, 31, 25, 20],
+    12: [34, 39, 43, 38, 33, 28],
+    13: [35, 40, 44, 39, 34, 29],
+    14: [36, 41, 45, 40, 35, 30],
+    15: [37, 42, 46, 41, 36, 31],
+    16: [44, 48, 51, 47, 43, 39],
+    17: [45, 49, 52, 48, 44, 40],
+    18: [46, 50, 53, 49, 45, 41],
 }
 
-# Harbor vertex pairs (edges that border the sea) - canonical layout
+# Harbor vertex pairs (perimeter edges that border the sea), spread around
+# the coastline of the layout above.
 HARBOR_LOCATIONS = [
-    (0, 1),
-    (3, 4),
-    (7, 17),
-    (15, 25),
-    (27, 38),
-    (35, 47),
-    (39, 48),
-    (44, 53),
-    (50, 51),
+    (33, 38),
+    (16, 21),
+    (3, 7),
+    (1, 5),
+    (6, 10),
+    (20, 26),
+    (42, 46),
+    (49, 53),
+    (48, 51),
 ]
 
 

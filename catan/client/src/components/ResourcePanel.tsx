@@ -1,14 +1,7 @@
 import { RESOURCE_FILL } from "../board/geometry";
 import type { PlayerDTO } from "../types";
 import { RESOURCES } from "../types";
-
-const ICONS: Record<string, string> = {
-  LUMBER: "🪵",
-  BRICK: "🧱",
-  WOOL: "🐑",
-  GRAIN: "🌾",
-  ORE: "⛰",
-};
+import { ResourceIcon } from "./icons/ResourceIcons";
 
 export function ResourcePanel({ me }: { me: PlayerDTO | null }) {
   if (!me || !me.resources) return null;
@@ -21,11 +14,11 @@ export function ResourcePanel({ me }: { me: PlayerDTO | null }) {
         {RESOURCES.map((r) => (
           <div
             key={r}
-            className="flex flex-col items-center rounded-md py-1"
+            className="flex flex-col items-center rounded-md py-1 gap-0.5"
             style={{ backgroundColor: RESOURCE_FILL[r] + "33" }}
           >
-            <span className="text-lg">{ICONS[r]}</span>
-            <span className="font-bold">{me.resources![r]}</span>
+            <ResourceIcon resource={r} size={22} title={r} />
+            <span className="font-bold leading-none">{me.resources![r]}</span>
             <span className="text-[10px] uppercase text-slate-400">{r}</span>
           </div>
         ))}

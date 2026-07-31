@@ -1,10 +1,37 @@
 import { useGameStore } from "../stores/gameStore";
 import type { GameStateDTO, PlayerDTO } from "../types";
 import { RESOURCES } from "../types";
+import { ResourceIcon } from "./icons/ResourceIcons";
 
 interface Props {
   state: GameStateDTO;
   me: PlayerDTO | null;
+}
+
+export const PHASE_LABELS: Record<string, string> = {
+  SETUP_1: "Setup — round 1",
+  SETUP_2: "Setup — round 2",
+  ROLL: "Roll the dice",
+  MAIN: "Build & trade",
+  DISCARD: "Discard cards",
+  MOVE_ROBBER: "Move the robber",
+  ROBBER_STEAL: "Steal a card",
+  GAME_OVER: "Game over",
+};
+
+/** A small resource-cost badge: icon + count, repeated per resource. */
+function Cost({ needs }: { needs: Array<[string, number]> }) {
+  return (
+    <span className="inline-flex items-center gap-1 ml-1">
+      {needs.map(([r, n]) => (
+        <span key={r} className="inline-flex items-center gap-0.5">
+          {Array.from({ length: n }).map((_, i) => (
+            <ResourceIcon key={i} resource={r} size={14} />
+          ))}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 export function ActionBar({ state, me }: Props) {
@@ -23,7 +50,7 @@ export function ActionBar({ state, me }: Props) {
   return (
     <div className="flex flex-col gap-2 bg-catan-panel rounded-md p-3">
       <div className="text-xs uppercase text-slate-400">
-        Phase: <span className="text-amber-300">{phase}</span>
+        <span className="text-amber-300">{PHASE_LABELS[phase] ?? phase}</span>
         {" · "}Turn {state.turn}
       </div>
 
@@ -53,32 +80,36 @@ export function ActionBar({ state, me }: Props) {
       {phase === "MAIN" && isMyTurn && (
         <>
           <button
-            className="btn-action"
+            className="btn-action flex items-center justify-between"
             disabled={!canAfford({ BRICK: 1, LUMBER: 1 })}
             onClick={() => store.setBuildMode({ type: "road" })}
           >
-            Build Road (1🧱 1🪵)
+            <span>Build Road</span>
+            <Cost needs={[["BRICK", 1], ["LUMBER", 1]]} />
           </button>
           <button
-            className="btn-action"
+            className="btn-action flex items-center justify-between"
             disabled={!canAfford({ BRICK: 1, LUMBER: 1, WOOL: 1, GRAIN: 1 })}
             onClick={() => store.setBuildMode({ type: "settlement" })}
           >
-            Build Settlement
+            <span>Build Settlement</span>
+            <Cost needs={[["BRICK", 1], ["LUMBER", 1], ["WOOL", 1], ["GRAIN", 1]]} />
           </button>
           <button
-            className="btn-action"
+            className="btn-action flex items-center justify-between"
             disabled={!canAfford({ GRAIN: 2, ORE: 3 })}
             onClick={() => store.setBuildMode({ type: "city" })}
           >
-            Build City
+            <span>Build City</span>
+            <Cost needs={[["GRAIN", 2], ["ORE", 3]]} />
           </button>
           <button
-            className="btn-action"
+            className="btn-action flex items-center justify-between"
             disabled={!canAfford({ ORE: 1, WOOL: 1, GRAIN: 1 }) || state.dev_card_deck_count === 0}
             onClick={() => store.buyDevCard()}
           >
-            Buy Dev Card
+            <span>Buy Dev Card</span>
+            <Cost needs={[["ORE", 1], ["WOOL", 1], ["GRAIN", 1]]} />
           </button>
           <button className="btn-secondary" onClick={() => store.endTurn()}>
             End Turn

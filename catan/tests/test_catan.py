@@ -22,9 +22,9 @@ def _setup_three_player_game(seed=1, zero_resources=False):
     """Run a deterministic setup sequence and return a game in ROLL phase."""
     game = Game(["Alice", "Bob", "Charlie"], seed=seed)
     # Pick snake-order placements that respect the distance rule on the
-    # canonical tile_to_vertices layout. We use opposite corners.
-    settlements = [0, 4, 6, 37, 33, 27]
-    roads = [(0, 1), (4, 5), (6, 14), (37, 38), (33, 34), (26, 27)]
+    # canonical tile_to_vertices layout (six pairwise non-adjacent vertices).
+    settlements = [0, 26, 15, 53, 33, 6]
+    roads = [(0, 3), (26, 32), (15, 20), (53, 50), (33, 28), (6, 10)]
     for s, r in zip(settlements, roads):
         ok_s, msg_s = game.place_setup_settlement(game.current_player, s)
         assert ok_s, (s, msg_s)
@@ -38,13 +38,69 @@ def _setup_three_player_game(seed=1, zero_resources=False):
     return game
 
 
+class TestBoardTopology(unittest.TestCase):
+    """Guards the canonical layout against malformed tile/vertex data.
+
+    A real Catan board is a planar hex tessellation: 54 vertices, 72 edges,
+    every vertex touches at most 3 tiles and has at most 3 neighbors. A prior
+    layout violated all of these (vertices shared by 4 tiles, degree-4
+    vertices, an orphaned vertex id), which broke both resource distribution
+    and on-screen road/settlement alignment.
+    """
+
+    def test_layout_is_valid_planar_hex_graph(self):
+        from catan.src.board import TILE_TO_VERTICES
+
+        # All 54 vertex ids referenced exactly, no orphans.
+        used = set()
+        for verts in TILE_TO_VERTICES.values():
+            self.assertEqual(len(verts), 6)
+            used.update(verts)
+        self.assertEqual(used, set(range(54)))
+
+        # Tiles-per-vertex <= 3.
+        tiles_per_vertex = {}
+        for verts in TILE_TO_VERTICES.values():
+            for v in verts:
+                tiles_per_vertex[v] = tiles_per_vertex.get(v, 0) + 1
+        self.assertLessEqual(max(tiles_per_vertex.values()), 3)
+
+        # 72 undirected edges, every vertex degree <= 3.
+        neighbors = {v: set() for v in range(54)}
+        edges = set()
+        for verts in TILE_TO_VERTICES.values():
+            for i in range(6):
+                a, b = verts[i], verts[(i + 1) % 6]
+                edges.add(tuple(sorted((a, b))))
+                neighbors[a].add(b)
+                neighbors[b].add(a)
+        self.assertEqual(len(edges), 72)
+        self.assertLessEqual(max(len(n) for n in neighbors.values()), 3)
+
+    def test_harbors_are_perimeter_edges(self):
+        from catan.src.board import HARBOR_LOCATIONS, TILE_TO_VERTICES
+
+        edge_tiles = {}
+        for t, verts in TILE_TO_VERTICES.items():
+            for i in range(6):
+                edge = tuple(sorted((verts[i], verts[(i + 1) % 6])))
+                edge_tiles.setdefault(edge, []).append(t)
+        self.assertEqual(len(HARBOR_LOCATIONS), 9)
+        for a, b in HARBOR_LOCATIONS:
+            edge = tuple(sorted((a, b)))
+            self.assertIn(edge, edge_tiles, f"harbor {edge} is not a board edge")
+            self.assertEqual(
+                len(edge_tiles[edge]), 1, f"harbor {edge} is not on the perimeter"
+            )
+
+
 class TestSetup(unittest.TestCase):
     def test_setup_snake_order(self):
         game = Game(["A", "B", "C"], seed=42)
         order = []
         # Place until setup is done, recording whose turn each step is
-        settlements = [0, 4, 6, 37, 33, 27]
-        roads = [(0, 1), (4, 5), (6, 14), (37, 38), (33, 34), (26, 27)]
+        settlements = [0, 26, 15, 53, 33, 6]
+        roads = [(0, 3), (26, 32), (15, 20), (53, 50), (33, 28), (6, 10)]
         for s, r in zip(settlements, roads):
             order.append(game.current_player.name)
             ok, _ = game.place_setup_settlement(game.current_player, s)
@@ -59,9 +115,9 @@ class TestSetup(unittest.TestCase):
         # Place first settlement
         ok, _ = game.place_setup_settlement(game.current_player, 0)
         self.assertTrue(ok)
-        game.place_setup_road(game.current_player, (0, 1))
-        # Player B cannot place adjacent to vertex 0 (e.g., vertex 1 is adjacent)
-        ok, msg = game.place_setup_settlement(game.current_player, 1)
+        game.place_setup_road(game.current_player, (0, 3))
+        # Player B cannot place adjacent to vertex 0 (vertex 3 is adjacent)
+        ok, msg = game.place_setup_settlement(game.current_player, 3)
         self.assertFalse(ok)
 
     def test_setup_second_round_grants_resources(self):
@@ -76,7 +132,7 @@ class TestPlay(unittest.TestCase):
         p = game.current_player
         p.resources[Resource.BRICK] = 1
         p.resources[Resource.LUMBER] = 1
-        ok, msg = game.build_road(p, (0, 8))
+        ok, msg = game.build_road(p, (0, 3))
         self.assertFalse(ok)
         self.assertEqual(game.phase, TurnPhase.ROLL)
 
@@ -99,9 +155,9 @@ class TestPlay(unittest.TestCase):
         game.dice_roll = 6
         p.resources[Resource.BRICK] = 1
         p.resources[Resource.LUMBER] = 1
-        # Player 0's settlements were at 0 and 37; they own road (0,1) and (37,38).
-        # Edge (20,21) is a valid board edge but not connected to player 0's network.
-        ok, msg = game.build_road(p, (20, 21))
+        # Player 0's settlements were at 0 and 6; they own roads (0,3) and (6,10).
+        # Edge (4,8) is a valid board edge but not connected to player 0's network.
+        ok, msg = game.build_road(p, (4, 8))
         self.assertFalse(ok, msg)
 
     def test_build_city_upgrades_settlement(self):
@@ -203,6 +259,7 @@ class TestTrading(unittest.TestCase):
         game.dice_roll = 5
         p.harbors = []  # ensure no discounted harbors
         p.resources[Resource.WOOL] = 4
+        p.resources[Resource.ORE] = 0  # known baseline (setup may grant some)
         ok, ratio = game.maritime_trade(p, Resource.WOOL, Resource.ORE)
         self.assertTrue(ok)
         self.assertEqual(ratio, 4)
@@ -256,6 +313,8 @@ class TestDevelopmentCards(unittest.TestCase):
         game.phase = TurnPhase.MAIN
         game.dice_roll = 5
         p.development_cards.append(YearOfPlentyCard())
+        p.resources[Resource.ORE] = 0  # known baseline (setup may grant some)
+        p.resources[Resource.GRAIN] = 0
         ok, _ = game.play_development_card(
             p, "year_of_plenty", resource1="ORE", resource2="GRAIN"
         )

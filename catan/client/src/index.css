@@ -38,6 +38,16 @@ svg .vertex-hit:hover circle.vertex-dot,
 svg .edge-hit:hover line.edge-line {
   filter: drop-shadow(0 0 6px #ffd166);
 }
+/* Ghost preview of the building being placed, revealed on vertex hover. */
+svg .vertex-hit .vertex-ghost {
+  transition: opacity 0.12s ease;
+}
+svg .vertex-hit:hover .vertex-ghost {
+  opacity: 0.55 !important;
+}
+svg .vertex-hit:hover circle.vertex-dot {
+  opacity: 0 !important;
+}
 
 .scrollable {
   scrollbar-width: thin;
