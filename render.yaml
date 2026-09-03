@@ -1,0 +1,39 @@
+# Render blueprint — deploys the Catan app as a free Docker web service.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# One-time setup: push this repo to GitHub, then in the Render dashboard choose
+# "New +" -> "Blueprint" and select this repo. Render reads this file.
+#
+# Notes:
+#   * Rooms are in-memory and single-process, so plan/scaling stays at 1 instance.
+#   * The free plan spins down after ~15 min idle (cold start ~30s); any
+#     in-progress game is lost on spin-down — players just start a new room.
+#   * No database is configured, so accounts/stats use ephemeral SQLite inside
+#     the container (reset on each deploy/restart). To persist them, uncomment
+#     the `databases` block below and the DATABASE_URL env var.
+services:
+  - type: web
+    name: catan-online
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: feature/catan-game-logic
+    dockerfilePath: ./catan/Dockerfile
+    dockerContext: ./catan
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: CATAN_SECRET
+        generateValue: true      # Render generates a strong secret
+      - key: CATAN_CORS
+        value: "*"
+      # - key: DATABASE_URL       # uncomment with the databases block for persistence
+      #   fromDatabase:
+      #     name: catan-db
+      #     property: connectionString
+
+# databases:
+#   - name: catan-db
+#     plan: free
+#     databaseName: catan
+#     user: catan

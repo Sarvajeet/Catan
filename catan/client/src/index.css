@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .btn-primary {
+    @apply bg-amber-500 hover:bg-amber-400 disabled:bg-slate-600 disabled:cursor-not-allowed text-slate-900 font-semibold rounded-md px-4 py-2 transition-colors;
+  }
+  .btn-secondary {
+    @apply bg-sky-600 hover:bg-sky-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-semibold rounded-md px-4 py-2 transition-colors;
+  }
+  .btn-action {
+    @apply bg-catan-panel2 hover:bg-slate-700 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-100 font-medium rounded-md px-3 py-2 text-sm transition-colors;
+  }
+  .btn-ghost {
+    @apply bg-transparent hover:bg-slate-700/50 text-slate-200 rounded-md px-2 py-1 transition-colors;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 30% 20%, #1b3655 0%, #0a1624 80%);
+}
+
+/* Touch target size for interactive SVG elements */
+svg .vertex-hit,
+svg .edge-hit {
+  cursor: pointer;
+}
+svg .vertex-hit:hover circle.vertex-dot,
+svg .edge-hit:hover line.edge-line {
+  filter: drop-shadow(0 0 6px #ffd166);
+}
+/* Ghost preview of the building being placed, revealed on vertex hover. */
+svg .vertex-hit .vertex-ghost {
+  transition: opacity 0.12s ease;
+}
+svg .vertex-hit:hover .vertex-ghost {
+  opacity: 0.55 !important;
+}
+svg .vertex-hit:hover circle.vertex-dot {
+  opacity: 0 !important;
+}
+
+.scrollable {
+  scrollbar-width: thin;
+  scrollbar-color: #355072 transparent;
+}
+
+/* Color-blind-friendly player patterns layered on top of the player color */
+.pattern-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.25) 4px,
+    rgba(255, 255, 255, 0.25) 8px
+  );
+}

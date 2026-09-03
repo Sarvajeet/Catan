@@ -1,0 +1,28 @@
+# Node / frontend
+node_modules/
+*.tsbuildinfo
+# NOTE: catan/client/dist/ is intentionally committed so Flask can serve the
+# built UI without a Node build step — do not ignore it.
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Databases / instance data
+*.db
+instance/
+catan/web/instance/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Logs
+*.log
